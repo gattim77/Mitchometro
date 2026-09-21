@@ -1,8 +1,8 @@
-import { actor, database, encrypt, safeOrigin } from '@/lib/server/spotify';
+import { adminAuthorized } from '@/lib/server/admin-auth';
+import { database, encrypt, safeOrigin } from '@/lib/server/spotify';
 import { env } from 'cloudflare:workers';
 export async function POST(request: Request) {
-  const user = await actor();
-  if (!user?.isMasterOwner) return new Response(null, { status: 404 });
+  if (!(await adminAuthorized())) return new Response(null, { status: 404 });
   if (!safeOrigin(request)) return Response.json({ error: 'Richiesta non valida.' }, { status: 403 });
   const body = await request.json().catch(() => null) as {clientId?: unknown; clientSecret?: unknown} | null;
   if (typeof body?.clientId !== 'string' || typeof body?.clientSecret !== 'string' ||

@@ -15,6 +15,13 @@
       "when": 1790023550068,
       "tag": "0001_worried_gorilla_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790024697927,
+      "tag": "0002_bent_nick_fury",
+      "breakpoints": true
     }
   ]
 }

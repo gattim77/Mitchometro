@@ -1,12 +1,13 @@
+import { adminAuthorized } from '@/lib/server/admin-auth';
 import { actor, database, digest, randomUrlSafe, redirectUriFor, roleFrom, seeOther, spotifyConfig } from '@/lib/server/spotify';
 export async function GET(request: Request) {
   const user = await actor();
   if (!user) return Response.json({ error: 'Accedi al sito prima di collegare Spotify.' }, { status: 401 });
   const role = roleFrom(new URL(request.url).searchParams.get('role'));
   if (!role) return Response.json({ error: 'Ruolo non valido.' }, { status: 400 });
-  if (role === 'master' && !user.isMasterOwner) return new Response(null, { status: 404 });
+  if (role === 'master' && !(await adminAuthorized())) return new Response(null, { status: 404 });
   const config = await spotifyConfig();
-  if (!config) return seeOther('/?spotify=unconfigured');
+  if (!config) return seeOther(role === 'master' ? '/admin?spotify=unconfigured' : '/?spotify=unconfigured');
   try {
     const redirectUri = redirectUriFor(request, config.redirectUri);
     const db = database();

@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { ArrowLeft, ArrowUpRight, AudioLines, Check, Disc3, LockKeyhole, Plus, Save, Trash2 } from 'lucide-react';
 import type { EvaluationSettings } from '@/lib/server/evaluation-settings';
 
@@ -73,8 +72,12 @@ export default function AdminClient() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Salvataggio non riuscito.'); }
     finally { setBusy(false); }
   }
+  async function logout() {
+    await fetch('/api/admin/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) });
+    window.location.replace('/admin');
+  }
   return <div className="admin-page">
-    <header className="admin-top"><Link className="admin-brand" href="/"><AudioLines/> Mitch<span>ometro</span> <em>Admin</em></Link><Link className="admin-back" href="/"><ArrowLeft size={17}/> Torna alla dashboard</Link></header>
+    <header className="admin-top"><span className="admin-brand"><AudioLines/> Mitch<span>ometro</span> <em>Admin</em></span><div className="admin-top-actions"><button className="admin-back" onClick={() => window.location.href = '/'}><ArrowLeft size={17}/> Torna alla dashboard</button><button className="admin-logout" onClick={logout}>Esci</button></div></header>
     <main className="admin-main"><div className="admin-heading"><div className="eyebrow">ACCESSO RISERVATO AL MASTER</div><h1>La cabina di regia.</h1><p>Configura il collegamento privato e il tono dell’indice di gusto.</p></div>
       {notice && <div className="admin-alert success" role="status"><Check size={18}/>{notice}</div>}
       {error && <div className="admin-alert failure" role="alert">{error}</div>}
