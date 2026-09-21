@@ -27,6 +27,6 @@ export async function GET(request: Request) {
       .bind(user.id, attempt.role, profile.id, attempt.role === 'user' ? profile.display_name ?? null : null,
         await encrypt(token.access_token, config.tokenKey), await encrypt(token.refresh_token!, config.tokenKey),
         Date.now() + token.expires_in * 1000, Date.now()).run();
-    return seeOther(`/?spotify=${attempt.role === 'master' ? 'master-connected' : 'connected'}`);
+    return seeOther(attempt.role === 'master' ? '/admin?spotify=master-connected' : '/?spotify=connected');
   } catch (error) { console.error('Spotify authorization callback failed', error); return seeOther('/?spotify=unavailable'); }
 }

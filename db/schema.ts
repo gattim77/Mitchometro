@@ -27,3 +27,10 @@ export const spotifyAppSettings = sqliteTable('spotify_app_settings', {
   clientId: text('client_id').notNull(),
   clientSecret: text('client_secret').notNull(),
 });
+
+export const evaluationSettings = sqliteTable('evaluation_settings', {
+  id: integer('id').primaryKey(),
+  bandRules: text('band_rules').notNull(),
+  messages: text('messages').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
