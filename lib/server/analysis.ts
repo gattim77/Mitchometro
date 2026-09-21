@@ -20,7 +20,8 @@ export function analyze(period: keyof typeof samples, settings: EvaluationSettin
   const artists = new Set(demoArtists[period].map(name => name.toLocaleLowerCase('it')));
   const adjustment = Math.max(-20, Math.min(20, settings.bandRules.reduce((sum, rule) => sum + (artists.has(rule.name.toLocaleLowerCase('it')) ? rule.adjustment : 0), 0)));
   const score = Math.max(0, Math.min(120, baseScore + adjustment));
-  const scoreMessage = settings.messages.find(message => score >= message.min && score <= message.max)!;
+  const level = settings.messages.find(message => score >= message.min && score <= message.max)!;
+  const scoreMessage = level.variants[Math.floor(Math.random() * level.variants.length)];
   return { mode: 'demo', period, score, scoreMessage, match, artists: user.artists, tracks: user.tracks, metrics,
     genres: ['Alternative', 'Pop', 'R&B / Soul', 'Elettronica'].map((name, i) => ({ name, share: Math.round(user.genres[i] * 100) })),
     strength: { title: 'La tua identità si sente.', text: 'Torni ai suoni che ami senza perdere la tua personalità. Nel modello demo, la continuità delle tue preferenze supera il riferimento.' },
