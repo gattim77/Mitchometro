@@ -1,27 +1,21 @@
 # Mitchometro
 
-Italian music-taste dashboard prototype based on the supplied visual reference.
+Private Italian music dashboard inspired by the supplied visual reference. The dashboard's scores, strengths, matching, and sample tracks still use synthetic data. Live listening analysis is deliberately separate from the Spotify connection because [Spotify Developer Policy III.13](https://developer.spotify.com/policy) restricts derived listening metrics and benchmarking.
 
-## Status
+## Spotify connection
 
-This is a working sample-data application, not a live Spotify integration. No Spotify OAuth, tokens, personal data, or real baseline account are present. Spotify connection opens a truthful explanation of the pending integration. Before connecting real accounts, resolve Spotify Developer Policy III.13 (derived listening metrics and benchmarking), obtain baseline authorization, finalize the scoring model, and implement server-managed OAuth sessions and deletion/disconnection.
+The site owner creates a Spotify Developer app at https://developer.spotify.com/dashboard and registers this exact redirect URI:
 
-## Features
+`https://mitchometro-music-lab.marcog77.chatgpt.site/api/spotify/callback`
 
-- Responsive dashboard, 0–120 score, server-side reference fixed at 100
-- Three sample periods, strengths and improvement areas, aggregate genre matching
-- Track selection, search, and favourites held only in current browser memory
-- Accessible sidebar labels, dialogs, keyboard-operable tabs and period selector
-- Invalid period validation, no-store API responses, loading/error/retry handling
+Inside Mitchometro, the owner opens **Gestisci profilo master → Configura app** and enters the app's client ID and secret. The secret is encrypted in D1; it must not be committed or pasted into chat. The owner can then connect the master profile. Each signed-in visitor can independently connect or disconnect their own Spotify profile. The master management control and all master data are restricted to the site's owner. The site remains private under its existing Sites access policy until the owner explicitly shares it.
 
-`lib/server/analysis.ts` is imported only by `app/api/analysis/route.ts`; the client imports its TypeScript type only. The sample reference distributions are never returned by the API. Only aggregate results and synthetic user distributions are returned. This is data separation, not a claim that derived comparisons cannot reveal anything statistically about a reference.
+OAuth uses Authorization Code with PKCE, a single-use 10-minute state bound to the authenticated Sites visitor, and the minimal `user-read-private` scope. Access and refresh tokens are encrypted using the hosted `SPOTIFY_TOKEN_KEY`. Token refresh is handled server-side; invalid refresh tokens remove the connection. Disconnect deletes connection data. The app reads `/me` only during connection and never sends the master identity or tokens to a visitor.
 
-## Score model (provisional)
-
-Variety, discovery and identity are ratios to the reference capped at 120. Match is histogram intersection of genre distributions, 0–100. Overall score is rounded mean of the first three indicators × (0.8 + 0.2 × match/100). Comparing the reference with itself gives 100. Three indicators at 120 and match at 100 reach 120. All fixtures and conclusions are illustrative.
+`SPOTIFY_REDIRECT_URI`, `MASTER_USER_EMAIL`, and the 32-byte `SPOTIFY_TOKEN_KEY` are hosted runtime values managed by Sites. They are not in source. D1 migrations create the connection, OAuth-attempt, and developer-app settings tables. The app's `/privacy` page explains the collected data and deletion controls.
 
 ## Development
 
-Node >=22.13. `npm run install:ci`, `npm run dev`, `npm run build`.
+Node >=22.13. `npm run install:ci`, `npm run db:generate` after schema changes, `npm run dev`, `npm run build`. The local preview needs D1 migrations and equivalent development environment values to exercise OAuth.
 
-Album covers are externally hosted Apple Music artwork. Source links are recorded in `lib/tracks.ts`. No audio streams are embedded. Spotify links open searches in Spotify.
+Album covers are externally hosted Apple Music artwork; source links are in `lib/tracks.ts`. No audio is streamed in the app.
