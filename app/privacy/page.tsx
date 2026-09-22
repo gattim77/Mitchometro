@@ -1,3 +1,15 @@
 import Link from 'next/link';
+
 export const metadata = { title: 'Privacy — Mitchometro' };
-export default function Privacy() { return <main className="privacy-page"><Link href="/">← Mitchometro</Link><h1>Privacy</h1><p>Quando colleghi Spotify, Mitchometro legge solo i dati essenziali del profilo necessari a identificare la connessione. Chiediamo il permesso <strong>user-read-private</strong>. Non leggiamo i tuoi ascolti per i risultati mostrati nella dashboard: rimangono dati dimostrativi.</p><p>Conserviamo sul server l’ID Spotify, il nome visualizzato e i token necessari a mantenere il collegamento. I token e il segreto dell’app Spotify sono cifrati. Il proprietario del sito può collegare un profilo master separato: identità e token non vengono restituiti agli altri utenti.</p><p>Puoi disconnettere il tuo profilo dalla dashboard in qualsiasi momento. La disconnessione elimina dal server i dati di connessione e i token; l’app non richiederà più i tuoi dati. Puoi anche revocare l’autorizzazione dalle impostazioni del tuo account Spotify. Se un token non è più valido, eliminiamo la connessione.</p><p>Spotify riceve le richieste di autorizzazione e profilo quando colleghi l’account. Le copertine dei brani dimostrativi vengono caricate da Apple Music, che riceve la normale richiesta del browser. I brani salvati nella demo rimangono nella memoria della sessione e spariscono quando ricarichi la pagina.</p><p>Il sito è attualmente privato. Per domande o richieste sui dati, contatta il proprietario del sito tramite il canale con cui hai ricevuto l’accesso.</p></main>; }
+
+export default function Privacy() {
+  return <main className="privacy-page">
+    <Link href="/">← Mitchometro</Link>
+    <h1>Privacy</h1>
+    <p>Per il confronto puoi caricare i file JSON della tua cronologia di ascolto, scaricati direttamente dal tuo account Spotify. Mitchometro non si collega al tuo account Spotify e non chiede la tua password.</p>
+    <p>Il browser legge i file e invia al server solo i conteggi degli artisti e gli indicatori necessari per gli ultimi 28 giorni, 6 mesi e 12 mesi. Non salviamo i file originali, gli indirizzi IP, i dati sul dispositivo o la cronologia dei singoli brani.</p>
+    <p>Conserviamo il riepilogo sul server, associato al tuo accesso a Mitchometro. Puoi sostituirlo o eliminarlo in qualsiasi momento dal pulsante “Carica la tua cronologia”. L’admin carica un riferimento separato: il suo contenuto e la sua identità non vengono restituiti agli altri utenti.</p>
+    <p>Le copertine dei brani dimostrativi vengono caricate da Apple Music, che riceve la normale richiesta del browser. I brani salvati nella demo rimangono nella memoria della sessione e spariscono quando ricarichi la pagina.</p>
+    <p>Per domande o richieste sui dati, contatta il proprietario del sito tramite il canale con cui hai ricevuto il link.</p>
+  </main>;
+}

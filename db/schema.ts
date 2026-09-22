@@ -65,3 +65,11 @@ export const adminLoginLimits = sqliteTable('admin_login_limits', {
   failedCount: integer('failed_count').notNull(),
   lockedUntil: integer('locked_until').notNull(),
 });
+
+export const listeningProfiles = sqliteTable('listening_profiles', {
+  ownerId: text('owner_id').notNull(),
+  role: text('role', { enum: ['user', 'master'] }).notNull(),
+  summary: text('summary').notNull(),
+  uploadedAt: integer('uploaded_at').notNull(),
+  plays: integer('plays').notNull(),
+}, table => [primaryKey({ columns: [table.ownerId, table.role] })]);
