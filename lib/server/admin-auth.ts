@@ -7,9 +7,11 @@ export const ADMIN_COOKIE = '__Host-mitch-admin';
 const SESSION_MS = 12 * 60 * 60 * 1000;
 const SETUP_MS = 10 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
+const TRANSFER_MS = 24 * 60 * 60 * 1000;
 
 type Credential = { password_salt: string; password_hash: string; totp_secret: string; last_totp_step: number };
 type Pending = Credential & { owner_id: string; expires_at: number; attempts: number };
+type Transfer = { token_hash: string; email: string; requested_by: string; password_salt: string | null; password_hash: string | null; totp_secret: string | null; expires_at: number; attempts: number };
 
 function base32(bytes: Uint8Array) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -70,6 +72,10 @@ export async function adminAuthorized() {
   const session = await database().prepare('SELECT owner_id, expires_at FROM admin_sessions WHERE token_hash = ?').bind(await digest(token)).first<{ owner_id: string; expires_at: number }>();
   return !!session && session.owner_id === owner.id && session.expires_at > Date.now();
 }
+async function ensureAdminIdentity(ownerId: string, email: string) {
+  await database().prepare(`INSERT INTO admin_identity (id, owner_id, email, updated_at) VALUES (1, ?, ?, ?)
+    ON CONFLICT(id) DO NOTHING`).bind(ownerId, email.toLowerCase(), Date.now()).run();
+}
 export async function beginAdminSetup(ownerId: string, username: unknown, password: unknown) {
   if (username !== 'admin' || typeof password !== 'string' || password.length < 12 || password.length > 128) return { error: 'Usa admin e una password di almeno 12 caratteri.' };
   if (await adminConfigured()) return { error: 'L’accesso admin è già configurato.' };
@@ -93,6 +99,8 @@ export async function confirmAdminSetup(ownerId: string, username: unknown, code
     .bind(pending.password_salt, pending.password_hash, pending.totp_secret, step, Date.now()).run();
   if (!result.meta.changes) return null;
   await database().prepare('DELETE FROM admin_pending_setup WHERE id = 1').run();
+  const owner = await actor();
+  if (owner?.id === ownerId) await ensureAdminIdentity(ownerId, owner.email);
   return createAdminSession(ownerId);
 }
 export async function loginAdmin(ownerId: string, username: unknown, password: unknown, code: unknown) {
@@ -113,7 +121,96 @@ export async function loginAdmin(ownerId: string, username: unknown, password: u
   const updated = await database().prepare('UPDATE admin_credentials SET last_totp_step = ? WHERE id = 1 AND last_totp_step < ?').bind(step, step).run();
   if (!updated.meta.changes) return { error: 'Codice già usato. Attendi il prossimo.', status: 401 };
   await database().prepare('DELETE FROM admin_login_limits WHERE owner_id = ?').bind(ownerId).run();
+  const owner = await actor();
+  if (owner?.id === ownerId) await ensureAdminIdentity(ownerId, owner.email);
   return { token: await createAdminSession(ownerId) };
+}
+
+function validEmail(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+function validTransferToken(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{40,100}$/.test(value);
+}
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+}
+async function sendTransferEmail(email: string, link: string) {
+  if (!env.RESEND_API_KEY || !env.ADMIN_EMAIL_FROM) throw new Error('ADMIN_EMAIL_NOT_CONFIGURED');
+  const safeLink = escapeHtml(link);
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: env.ADMIN_EMAIL_FROM,
+      to: [email],
+      subject: 'Sei stato nominato nuovo Re di Mitchometro',
+      text: `Sei stato scelto come nuovo amministratore di Mitchometro. Completa il passaggio entro 24 ore: ${link}\n\nDovrai accedere con questo indirizzo email, scegliere una nuova password e configurare una nuova autenticazione a due fattori. Se non ti aspettavi questo invito, ignoralo.`,
+      html: `<h1>Il trono ti aspetta.</h1><p>Sei stato scelto come nuovo amministratore di Mitchometro.</p><p><a href="${safeLink}">Accetta la nomina</a> entro 24 ore.</p><p>Dovrai accedere con questo indirizzo email, scegliere una nuova password e configurare una nuova autenticazione a due fattori. Se non ti aspettavi questo invito, ignora questa email.</p>`,
+    }),
+  });
+  if (!response.ok) throw new Error(`ADMIN_EMAIL_FAILED:${response.status}`);
+}
+export async function requestAdminTransfer(ownerId: string, currentEmail: string, emailValue: unknown, origin: string) {
+  if (!validEmail(emailValue)) return { error: 'Inserisci un indirizzo email valido.', status: 400 };
+  const email = emailValue.trim().toLowerCase();
+  if (email === currentEmail.toLowerCase()) return { error: 'Il nuovo Re deve usare un indirizzo diverso da quello attuale.', status: 400 };
+  const token = randomUrlSafe(32);
+  const tokenHash = await digest(token);
+  await database().prepare(`INSERT INTO admin_transfers (id, token_hash, email, requested_by, password_salt, password_hash, totp_secret, expires_at, attempts)
+    VALUES (1, ?, ?, ?, NULL, NULL, NULL, ?, 0) ON CONFLICT(id) DO UPDATE SET token_hash = excluded.token_hash, email = excluded.email,
+    requested_by = excluded.requested_by, password_salt = NULL, password_hash = NULL, totp_secret = NULL, expires_at = excluded.expires_at, attempts = 0`)
+    .bind(tokenHash, email, ownerId, Date.now() + TRANSFER_MS).run();
+  try { await sendTransferEmail(email, `${origin}/admin/transfer?token=${encodeURIComponent(token)}`); }
+  catch (error) {
+    await database().prepare('DELETE FROM admin_transfers WHERE token_hash = ?').bind(tokenHash).run();
+    throw error;
+  }
+  return { ok: true as const, email };
+}
+async function activeTransfer(token: unknown, email: string) {
+  if (!validTransferToken(token)) return null;
+  const transfer = await database().prepare('SELECT token_hash, email, requested_by, password_salt, password_hash, totp_secret, expires_at, attempts FROM admin_transfers WHERE id = 1 AND token_hash = ?')
+    .bind(await digest(token)).first<Transfer>();
+  return transfer && transfer.email === email.toLowerCase() && transfer.expires_at > Date.now() && transfer.attempts < 5 ? transfer : null;
+}
+export async function adminTransferStatus(token: unknown, email: string) {
+  const transfer = await activeTransfer(token, email);
+  return { valid: !!transfer, email: transfer?.email ?? null, enrollmentStarted: !!transfer?.totp_secret };
+}
+export async function beginAdminTransfer(token: unknown, ownerId: string, email: string, password: unknown) {
+  const transfer = await activeTransfer(token, email);
+  if (!transfer) return { error: 'Invito non valido, scaduto o destinato a un altro account.' };
+  if (typeof password !== 'string' || password.length < 12 || password.length > 128) return { error: 'Scegli una password di almeno 12 caratteri.' };
+  const secret = base32(crypto.getRandomValues(new Uint8Array(20)));
+  const salt = randomUrlSafe(16);
+  await database().prepare('UPDATE admin_transfers SET password_salt = ?, password_hash = ?, totp_secret = ?, attempts = 0 WHERE token_hash = ?')
+    .bind(salt, await adminPasswordHash(password, salt), await encrypt(secret, encryptionKey()), transfer.token_hash).run();
+  return { secret, uri: `otpauth://totp/Mitchometro%20Admin:admin?secret=${secret}&issuer=Mitchometro%20Admin&algorithm=SHA1&digits=6&period=30`, ownerId };
+}
+export async function completeAdminTransfer(token: unknown, ownerId: string, email: string, code: unknown) {
+  const transfer = await activeTransfer(token, email);
+  if (!transfer?.password_salt || !transfer.password_hash || !transfer.totp_secret || typeof code !== 'string') return null;
+  const step = await matchedTotpStep(await decrypt(transfer.totp_secret, encryptionKey()), code);
+  if (step === null) {
+    await database().prepare('UPDATE admin_transfers SET attempts = attempts + 1 WHERE token_hash = ?').bind(transfer.token_hash).run();
+    return null;
+  }
+  const sessionToken = randomUrlSafe(32);
+  const now = Date.now();
+  const db = database();
+  await db.batch([
+    db.prepare('UPDATE admin_credentials SET password_salt = ?, password_hash = ?, totp_secret = ?, last_totp_step = ?, created_at = ? WHERE id = 1').bind(transfer.password_salt, transfer.password_hash, transfer.totp_secret, step, now),
+    db.prepare(`INSERT INTO admin_identity (id, owner_id, email, updated_at) VALUES (1, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET owner_id = excluded.owner_id, email = excluded.email, updated_at = excluded.updated_at`).bind(ownerId, email.toLowerCase(), now),
+    db.prepare("DELETE FROM listening_profiles WHERE owner_id = ? AND role = 'master'").bind(ownerId),
+    db.prepare("UPDATE listening_profiles SET owner_id = ? WHERE role = 'master'").bind(ownerId),
+    db.prepare('DELETE FROM admin_sessions'),
+    db.prepare('DELETE FROM admin_login_limits'),
+    db.prepare('DELETE FROM admin_transfers'),
+    db.prepare('INSERT INTO admin_sessions (token_hash, owner_id, expires_at) VALUES (?, ?, ?)').bind(await digest(sessionToken), ownerId, now + SESSION_MS),
+  ]);
+  return sessionToken;
 }
 async function createAdminSession(ownerId: string) {
   const token = randomUrlSafe(32);

@@ -6,7 +6,12 @@ const encoder = new TextEncoder();
 export async function actor() {
   const user = await getChatGPTUser();
   if (!user) return null;
-  return { id: user.userId, isMasterOwner: !!env.MASTER_USER_EMAIL && user.email.toLowerCase() === env.MASTER_USER_EMAIL.toLowerCase() };
+  const identity = await database().prepare('SELECT owner_id, email FROM admin_identity WHERE id = 1').first<{ owner_id: string; email: string }>();
+  const email = user.email.toLowerCase();
+  const isMasterOwner = identity
+    ? identity.owner_id === user.userId && identity.email === email
+    : !!env.MASTER_USER_EMAIL && email === env.MASTER_USER_EMAIL.toLowerCase();
+  return { id: user.userId, email, isMasterOwner };
 }
 
 export function database() {

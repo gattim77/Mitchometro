@@ -38,6 +38,25 @@ export const adminLoginLimits = sqliteTable('admin_login_limits', {
   lockedUntil: integer('locked_until').notNull(),
 });
 
+export const adminIdentity = sqliteTable('admin_identity', {
+  id: integer('id').primaryKey(),
+  ownerId: text('owner_id').notNull(),
+  email: text('email').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const adminTransfers = sqliteTable('admin_transfers', {
+  id: integer('id').primaryKey(),
+  tokenHash: text('token_hash').notNull(),
+  email: text('email').notNull(),
+  requestedBy: text('requested_by').notNull(),
+  passwordSalt: text('password_salt'),
+  passwordHash: text('password_hash'),
+  totpSecret: text('totp_secret'),
+  expiresAt: integer('expires_at').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+});
+
 export const listeningProfiles = sqliteTable('listening_profiles', {
   ownerId: text('owner_id').notNull(),
   role: text('role', { enum: ['user', 'master'] }).notNull(),

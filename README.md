@@ -6,6 +6,8 @@ There is no Spotify account connection, OAuth, Client ID, or Spotify API access.
 
 The `/admin` page is restricted to the single Sites account whose email matches `MASTER_USER_EMAIL`. That owner sets a password for the fixed `admin` username and enrolls a TOTP authenticator. The existing `SPOTIFY_TOKEN_KEY` runtime secret remains in use solely as the encryption key for admin TOTP data; it is not used for any Spotify connection. Admin settings include artist bonuses and penalties and five editable sarcastic messages in each of twelve score bands.
 
+The current admin can use **Nomina il nuovo Re** to send a 24-hour, one-time transfer link. The recipient must sign in with the invited email, choose a new password, and enroll a new TOTP authenticator. Completing enrollment replaces the admin identity and credentials, moves ownership of the private master upload, revokes every previous admin session, and signs in the new admin. Transactional email uses Resend's HTTPS API and requires `RESEND_API_KEY` (secret) plus `ADMIN_EMAIL_FROM` (a sender on a verified Resend domain) in the Site runtime environment.
+
 ## Development
 
 Node >=22.13. Install dependencies, apply D1 migrations, then run `node scripts/run-framework.mjs dev` or `node scripts/run-framework.mjs build`. The local preview needs the D1 binding and the admin runtime values to exercise admin authentication.
