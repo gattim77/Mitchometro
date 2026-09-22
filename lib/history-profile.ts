@@ -12,13 +12,14 @@ export type HistoryProfile = {
   version: 1 | 2;
   windows: Record<Period, HistoryWindow>;
   rotationTracks?: RotationTrack[];
+  source?: 'recent' | 'upload';
 };
 
 const day = 86_400_000;
 const windows: Record<Period, number> = { month: 28 * day, semester: 183 * day, year: 365 * day };
 
 export async function profileFromFiles(files: File[], includeRotationTracks = false): Promise<HistoryProfile> {
-  if (!files.length || files.length > 50) throw new Error('Seleziona fino a 50 file JSON della cronologia.');
+  if (!files.length || files.length > 200) throw new Error('Seleziona fino a 200 file JSON della cronologia.');
   const now = Date.now();
   const buckets = Object.fromEntries(periods.map(period => [period, {
     plays: 0, artists: new Map<string, ArtistCount>(), tracks: new Set<string>(),
@@ -26,6 +27,7 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
   const seen = new Set<string>();
   const rotation = new Map<string, RotationTrack & { count: number }>();
   let found = 0;
+  let foundExtended = false;
   for (const file of files) {
     if (!file.name.toLowerCase().endsWith('.json') || file.size > 75_000_000) throw new Error('Usa i file JSON estratti da Spotify, massimo 75 MB ciascuno.');
     let rows: unknown;
@@ -35,6 +37,7 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
     for (const raw of rows) {
       if (!raw || typeof raw !== 'object') continue;
       const row = raw as Record<string, unknown>;
+      if (typeof row.ts === 'string' && typeof row.master_metadata_album_artist_name === 'string') foundExtended = true;
       const artist = typeof row.master_metadata_album_artist_name === 'string' ? row.master_metadata_album_artist_name : row.artistName;
       const track = typeof row.master_metadata_track_name === 'string' ? row.master_metadata_track_name : row.trackName;
       const time = typeof row.ts === 'string' ? row.ts : row.endTime;
@@ -68,9 +71,11 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
       }
     }
   }
+  if (!foundExtended) throw new Error('Seleziona i JSON della Cronologia di ascolto estesa: la cronologia standard contiene solo l’ultimo anno.');
   if (!found) throw new Error('Non abbiamo trovato brani ascoltati nell’ultimo anno. Seleziona i JSON della cronologia di ascolto.');
   return {
     version: includeRotationTracks ? 2 : 1,
+    source: 'upload',
     windows: Object.fromEntries(periods.map(period => {
       const bucket = buckets[period];
       return [period, {
@@ -115,7 +120,8 @@ export function validateHistoryProfile(input: unknown): HistoryProfile | null {
     windows[period] = { plays: value.plays as number, uniqueArtists: value.uniqueArtists as number, uniqueTracks: value.uniqueTracks as number, artists };
   }
   if (windows.month.plays > windows.semester.plays || windows.semester.plays > windows.year.plays) return null;
-  if (source.version === 1) return { version: 1, windows };
+  const profileSource = source.source === 'recent' || source.source === 'upload' ? source.source : undefined;
+  if (source.version === 1) return { version: 1, windows, ...(profileSource ? { source: profileSource } : {}) };
   if (!Array.isArray(source.rotationTracks) || source.rotationTracks.length < 1 || source.rotationTracks.length > 500 || source.rotationTracks.length > windows.year.uniqueTracks) return null;
   const rotationTracks: RotationTrack[] = [];
   const trackKeys = new Set<string>();
@@ -128,5 +134,5 @@ export function validateHistoryProfile(input: unknown): HistoryProfile | null {
     trackKeys.add(key);
     rotationTracks.push({ artist: track.artist, title: track.title });
   }
-  return { version: 2, windows, rotationTracks };
+  return { version: 2, windows, rotationTracks, ...(profileSource ? { source: profileSource } : {}) };
 }
