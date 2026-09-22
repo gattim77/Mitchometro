@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, FileUp, Trash2 } from 'lucide-react';
 import { profileFromFiles } from '@/lib/history-profile';
 
-type Status = { mine: { uploadedAt: number; plays: number } | null; masterReady: boolean; master?: { uploadedAt: number; plays: number } | null };
+type Status = { mine: { uploadedAt: number; plays: number } | null; masterReady: boolean; master?: { uploadedAt: number; plays: number; rotationReady: boolean } | null };
 
 export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'master'; onUpdated?: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
@@ -24,7 +24,7 @@ export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'mas
   async function upload() {
     setBusy(true); setError(''); setNotice('');
     try {
-      const profile = await profileFromFiles(files);
+      const profile = await profileFromFiles(files, role === 'master');
       const response = await fetch('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role, profile }) });
       const result = await response.json() as { error?: string; plays?: number };
       if (!response.ok) throw new Error(result.error || 'Caricamento non riuscito.');
@@ -52,11 +52,12 @@ export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'mas
       <li>Richiedi <strong>Cronologia di ascolto</strong> (ultimo anno) o <strong>Cronologia di ascolto estesa</strong> (intero account).</li>
       <li>Quando Spotify ti invia lo ZIP, estrailo e seleziona qui tutti i file JSON della cronologia musicale.</li>
     </ol>
-    <p className="history-help">Accettiamo i JSON standard e quelli della cronologia estesa. Escludiamo podcast e riproduzioni sotto i 30 secondi. Il browser invia soltanto i conteggi degli artisti necessari al confronto: IP, dispositivo e file originali non vengono salvati.</p>
+    <p className="history-help">Accettiamo i JSON standard e quelli della cronologia estesa. Escludiamo podcast e riproduzioni sotto i 30 secondi. {role === 'master' ? 'Oltre ai conteggi degli artisti, salviamo fino a 500 titoli e artisti tra i brani più ascoltati nell’ultimo anno per la rotazione casuale della dashboard. Un brano alla volta sarà visibile agli utenti; il profilo completo rimane privato.' : 'Il browser invia soltanto i conteggi degli artisti necessari al confronto.'} IP, dispositivo e file originali non vengono salvati.</p>
     <label className="history-file-label"><FileUp size={18}/> Seleziona i file JSON<input type="file" accept=".json,application/json" multiple onChange={event => setFiles([...event.target.files ?? []])} /></label>
     {files.length > 0 && <p className="history-selected">{files.length} {files.length === 1 ? 'file selezionato' : 'file selezionati'}: {files.map(file => file.name).join(', ')}</p>}
     <div className="history-actions"><button className="connect" type="button" disabled={busy || !files.length} onClick={upload}>{busy ? 'Elaborazione…' : current ? 'Sostituisci cronologia' : 'Carica cronologia'}</button>{current && <button className="history-delete" type="button" disabled={busy} onClick={remove}><Trash2 size={15}/> Elimina</button>}</div>
     {current && <p className="history-status">Ultimo caricamento: {new Date(current.uploadedAt).toLocaleDateString('it-IT')} · {current.plays.toLocaleString('it-IT')} ascolti nell’ultimo anno.</p>}
+    {role === 'master' && current && !status?.master?.rotationReady && <p className="history-status">Ricarica la cronologia master per attivare la rotazione casuale dei brani: il caricamento precedente conservava solo gli artisti.</p>}
     {role === 'user' && status && !status.masterReady && <p className="history-status">Il confronto sarà disponibile quando l’admin avrà caricato la cronologia master.</p>}
     {notice && <p className="history-success" role="status">{notice}</p>}
     {error && <p className="history-error" role="alert">{error}</p>}

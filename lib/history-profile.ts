@@ -1,6 +1,7 @@
 export const periods = ['month', 'semester', 'year'] as const;
 export type Period = (typeof periods)[number];
 export type ArtistCount = { name: string; count: number };
+export type RotationTrack = { artist: string; title: string };
 export type HistoryWindow = {
   plays: number;
   uniqueArtists: number;
@@ -8,20 +9,22 @@ export type HistoryWindow = {
   artists: ArtistCount[];
 };
 export type HistoryProfile = {
-  version: 1;
+  version: 1 | 2;
   windows: Record<Period, HistoryWindow>;
+  rotationTracks?: RotationTrack[];
 };
 
 const day = 86_400_000;
 const windows: Record<Period, number> = { month: 28 * day, semester: 183 * day, year: 365 * day };
 
-export async function profileFromFiles(files: File[]): Promise<HistoryProfile> {
+export async function profileFromFiles(files: File[], includeRotationTracks = false): Promise<HistoryProfile> {
   if (!files.length || files.length > 50) throw new Error('Seleziona fino a 50 file JSON della cronologia.');
   const now = Date.now();
   const buckets = Object.fromEntries(periods.map(period => [period, {
     plays: 0, artists: new Map<string, ArtistCount>(), tracks: new Set<string>(),
   }])) as Record<Period, { plays: number; artists: Map<string, ArtistCount>; tracks: Set<string> }>;
   const seen = new Set<string>();
+  const rotation = new Map<string, RotationTrack & { count: number }>();
   let found = 0;
   for (const file of files) {
     if (!file.name.toLowerCase().endsWith('.json') || file.size > 75_000_000) throw new Error('Usa i file JSON estratti da Spotify, massimo 75 MB ciascuno.');
@@ -49,6 +52,11 @@ export async function profileFromFiles(files: File[]): Promise<HistoryProfile> {
       seen.add(eventKey);
       found++;
       if (found > 1_000_000) throw new Error('La cronologia supera un milione di ascolti; prova a selezionare meno file.');
+      if (includeRotationTracks) {
+        const existing = rotation.get(trackKey);
+        if (existing) existing.count++;
+        else rotation.set(trackKey, { artist: artistName, title: trackName, count: 1 });
+      }
       for (const period of periods) {
         if (playedAt < now - windows[period]) continue;
         const bucket = buckets[period];
@@ -62,7 +70,7 @@ export async function profileFromFiles(files: File[]): Promise<HistoryProfile> {
   }
   if (!found) throw new Error('Non abbiamo trovato brani ascoltati nell’ultimo anno. Seleziona i JSON della cronologia di ascolto.');
   return {
-    version: 1,
+    version: includeRotationTracks ? 2 : 1,
     windows: Object.fromEntries(periods.map(period => {
       const bucket = buckets[period];
       return [period, {
@@ -72,13 +80,14 @@ export async function profileFromFiles(files: File[]): Promise<HistoryProfile> {
         artists: [...bucket.artists.values()].sort((a, b) => b.count - a.count).slice(0, 4_000),
       }];
     })) as Record<Period, HistoryWindow>,
+    ...(includeRotationTracks ? { rotationTracks: [...rotation.values()].sort((a, b) => b.count - a.count).slice(0, 500).map(({ artist, title }) => ({ artist, title })) } : {}),
   };
 }
 
 export function validateHistoryProfile(input: unknown): HistoryProfile | null {
   if (!input || typeof input !== 'object') return null;
   const source = input as Record<string, unknown>;
-  if (source.version !== 1 || !source.windows || typeof source.windows !== 'object') return null;
+  if ((source.version !== 1 && source.version !== 2) || !source.windows || typeof source.windows !== 'object') return null;
   const windows = {} as Record<Period, HistoryWindow>;
   for (const period of periods) {
     const raw = (source.windows as Record<string, unknown>)[period];
@@ -106,5 +115,18 @@ export function validateHistoryProfile(input: unknown): HistoryProfile | null {
     windows[period] = { plays: value.plays as number, uniqueArtists: value.uniqueArtists as number, uniqueTracks: value.uniqueTracks as number, artists };
   }
   if (windows.month.plays > windows.semester.plays || windows.semester.plays > windows.year.plays) return null;
-  return { version: 1, windows };
+  if (source.version === 1) return { version: 1, windows };
+  if (!Array.isArray(source.rotationTracks) || source.rotationTracks.length < 1 || source.rotationTracks.length > 500 || source.rotationTracks.length > windows.year.uniqueTracks) return null;
+  const rotationTracks: RotationTrack[] = [];
+  const trackKeys = new Set<string>();
+  for (const item of source.rotationTracks) {
+    if (!item || typeof item !== 'object') return null;
+    const track = item as Record<string, unknown>;
+    if (typeof track.artist !== 'string' || typeof track.title !== 'string' || !track.artist.trim() || !track.title.trim() || track.artist.length > 100 || track.title.length > 150) return null;
+    const key = `${track.artist.toLocaleLowerCase('it')}\u0000${track.title.toLocaleLowerCase('it')}`;
+    if (trackKeys.has(key)) return null;
+    trackKeys.add(key);
+    rotationTracks.push({ artist: track.artist, title: track.title });
+  }
+  return { version: 2, windows, rotationTracks };
 }

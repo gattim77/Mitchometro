@@ -12,12 +12,13 @@ export async function GET() {
     const db = database();
     const mine = await db.prepare("SELECT uploaded_at, plays FROM listening_profiles WHERE owner_id = ? AND role = 'user'")
       .bind(user.userId).first<{ uploaded_at: number; plays: number }>();
-    const master = await db.prepare("SELECT uploaded_at, plays FROM listening_profiles WHERE role = 'master' ORDER BY uploaded_at DESC LIMIT 1")
-      .first<{ uploaded_at: number; plays: number }>();
+    const master = await db.prepare("SELECT uploaded_at, plays, summary FROM listening_profiles WHERE role = 'master' ORDER BY uploaded_at DESC LIMIT 1")
+      .first<{ uploaded_at: number; plays: number; summary: string }>();
+    const masterProfile = master && validateHistoryProfile(JSON.parse(master.summary));
     return Response.json({
       mine: mine ? { uploadedAt: mine.uploaded_at, plays: mine.plays } : null,
       masterReady: !!master,
-      ...(await adminAuthorized() ? { master: master ? { uploadedAt: master.uploaded_at, plays: master.plays } : null } : {}),
+      ...(await adminAuthorized() ? { master: master ? { uploadedAt: master.uploaded_at, plays: master.plays, rotationReady: !!masterProfile?.rotationTracks?.length } : null } : {}),
     }, { headers });
   } catch (error) {
     console.error('History status unavailable', error);
@@ -38,10 +39,12 @@ export async function POST(request: Request) {
   if (role === 'master' && !await adminAuthorized()) return new Response(null, { status: 404, headers });
   const profile = validateHistoryProfile(payload?.profile);
   if (!profile) return Response.json({ error: 'Cronologia non valida.' }, { status: 400, headers });
+  if (role === 'master' && !profile.rotationTracks?.length) return Response.json({ error: 'Ricarica i file della cronologia per attivare la rotazione dei brani.' }, { status: 400, headers });
+  const storedProfile = role === 'user' ? { version: 1 as const, windows: profile.windows } : profile;
   try {
     await database().prepare(`INSERT INTO listening_profiles (owner_id, role, summary, uploaded_at, plays) VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(owner_id, role) DO UPDATE SET summary = excluded.summary, uploaded_at = excluded.uploaded_at, plays = excluded.plays`)
-      .bind(user.userId, role, JSON.stringify(profile), Date.now(), profile.windows.year.plays).run();
+      .bind(user.userId, role, JSON.stringify(storedProfile), Date.now(), profile.windows.year.plays).run();
     return Response.json({ ok: true, plays: profile.windows.year.plays }, { headers });
   } catch (error) {
     console.error('History upload failed', error);
