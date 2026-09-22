@@ -1,24 +1,16 @@
 import { cookies } from 'next/headers';
 import { env } from 'cloudflare:workers';
 import { actor, database, decrypt, digest, encrypt, randomUrlSafe } from './spotify';
+import { adminPasswordHash } from './admin-password';
 
 export const ADMIN_COOKIE = '__Host-mitch-admin';
 const SESSION_MS = 12 * 60 * 60 * 1000;
 const SETUP_MS = 10 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
-const encoder = new TextEncoder();
 
 type Credential = { password_salt: string; password_hash: string; totp_secret: string; last_totp_step: number };
 type Pending = Credential & { owner_id: string; expires_at: number; attempts: number };
 
-function bytesToUrl(bytes: Uint8Array) {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function urlToBytes(value: string) {
-  return Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), char => char.charCodeAt(0));
-}
 function base32(bytes: Uint8Array) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = 0, value = 0, output = '';
@@ -45,11 +37,6 @@ function equalStrings(a: string, b: string) {
   let difference = a.length ^ b.length;
   for (let i = 0; i < Math.max(a.length, b.length); i++) difference |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   return difference === 0;
-}
-async function passwordHash(password: string, salt: string) {
-  const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: urlToBytes(salt) as BufferSource, iterations: 310_000, hash: 'SHA-256' }, key, 256);
-  return bytesToUrl(new Uint8Array(bits));
 }
 async function totpAt(secret: string, step: number) {
   const key = await crypto.subtle.importKey('raw', base32Bytes(secret) as BufferSource, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
@@ -90,7 +77,7 @@ export async function beginAdminSetup(ownerId: string, username: unknown, passwo
   const salt = randomUrlSafe(16);
   await database().prepare(`INSERT INTO admin_pending_setup (id, owner_id, password_salt, password_hash, totp_secret, expires_at, attempts) VALUES (1, ?, ?, ?, ?, ?, 0)
     ON CONFLICT(id) DO UPDATE SET owner_id = excluded.owner_id, password_salt = excluded.password_salt, password_hash = excluded.password_hash, totp_secret = excluded.totp_secret, expires_at = excluded.expires_at, attempts = 0`)
-    .bind(ownerId, salt, await passwordHash(password, salt), await encrypt(secret, encryptionKey()), Date.now() + SETUP_MS).run();
+    .bind(ownerId, salt, await adminPasswordHash(password, salt), await encrypt(secret, encryptionKey()), Date.now() + SETUP_MS).run();
   return { secret, uri: `otpauth://totp/Mitchometro%20Admin:admin?secret=${secret}&issuer=Mitchometro%20Admin&algorithm=SHA1&digits=6&period=30` };
 }
 export async function confirmAdminSetup(ownerId: string, username: unknown, code: unknown) {
@@ -113,7 +100,7 @@ export async function loginAdmin(ownerId: string, username: unknown, password: u
   if (limit && limit.locked_until > Date.now()) return { error: 'Troppi tentativi. Riprova tra 15 minuti.', status: 429 };
   const credentials = await database().prepare('SELECT password_salt, password_hash, totp_secret, last_totp_step FROM admin_credentials WHERE id = 1').first<Credential>();
   if (!credentials) return { error: 'Configura prima l’accesso admin.', status: 409 };
-  const validPassword = typeof password === 'string' && password.length <= 128 && equalStrings(await passwordHash(password, credentials.password_salt), credentials.password_hash);
+  const validPassword = typeof password === 'string' && password.length <= 128 && equalStrings(await adminPasswordHash(password, credentials.password_salt), credentials.password_hash);
   let step: number | null = null;
   if (validPassword && username === 'admin' && typeof code === 'string') step = await matchedTotpStep(await decrypt(credentials.totp_secret, encryptionKey()), code, credentials.last_totp_step);
   if (!validPassword || username !== 'admin' || step === null) {
