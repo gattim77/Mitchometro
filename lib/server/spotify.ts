@@ -9,11 +9,10 @@ const encoder = new TextEncoder();
 export async function spotifyConfig() {
   const redirectUri = env.SPOTIFY_REDIRECT_URI;
   const tokenKey = env.SPOTIFY_TOKEN_KEY;
-  const ownerEmail = env.MASTER_USER_EMAIL;
-  if (!redirectUri || !tokenKey || !ownerEmail) return null;
-  const row = await database().prepare('SELECT client_id, client_secret FROM spotify_app_settings WHERE id = 1').first<{ client_id: string; client_secret: string }>();
+  if (!redirectUri || !tokenKey) return null;
+  const row = await database().prepare('SELECT client_id FROM spotify_app_settings WHERE id = 1').first<{ client_id: string }>();
   if (!row) return null;
-  return { id: row.client_id, secret: await decrypt(row.client_secret, tokenKey), redirectUri, tokenKey, ownerEmail };
+  return { id: row.client_id, redirectUri, tokenKey };
 }
 
 export async function actor() {
@@ -84,9 +83,8 @@ export async function decrypt(value: string, keyString: string) {
 }
 
 export async function tokenExchange(code: string, verifier: string, config: NonNullable<Awaited<ReturnType<typeof spotifyConfig>>>) {
-  const params = new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: config.redirectUri, code_verifier: verifier });
-  const basic = btoa(`${config.id}:${config.secret}`);
-  const response = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: params });
+  const params = new URLSearchParams({ client_id: config.id, grant_type: 'authorization_code', code, redirect_uri: config.redirectUri, code_verifier: verifier });
+  const response = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params });
   if (!response.ok) throw new Error(`Spotify token request failed: ${response.status}`);
   const token = await response.json() as SpotifyToken;
   if (!token.access_token || !token.refresh_token || !Number.isFinite(token.expires_in)) throw new Error('Spotify returned an incomplete token');
@@ -109,8 +107,7 @@ export async function validAccessToken(ownerId: string, role: Role): Promise<str
   if (!row) return null;
   if (row.expires_at > Date.now() + 60_000) return decrypt(row.access_token, config.tokenKey);
   const oldRefresh = await decrypt(row.refresh_token, config.tokenKey);
-  const basic = btoa(`${config.id}:${config.secret}`);
-  const response = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: oldRefresh }) });
+  const response = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: config.id, grant_type: 'refresh_token', refresh_token: oldRefresh }) });
   if (response.status === 400 || response.status === 401) {
     await db.prepare('DELETE FROM spotify_connections WHERE owner_id = ? AND role = ?').bind(ownerId, role).run();
     return null;
