@@ -71,7 +71,7 @@ export function analyzeHistory(period: Period, userProfile: HistoryProfile, mast
   const scoreMessage = level.variants[Math.floor(Math.random() * level.variants.length)];
   const ranked = metrics.slice(0, 3).sort((a, b) => b.value - a.value);
   return {
-    mode: 'real' as const, sampleSource: userProfile.source === 'recent' ? 'recent' as const : userProfile.source === 'upload' ? 'upload' as const : 'legacy' as const, period, score, scoreMessage, match, artists: user.uniqueArtists, tracks: user.uniqueTracks, metrics,
+    mode: 'real' as const, period, score, scoreMessage, match, artists: user.uniqueArtists, tracks: user.uniqueTracks, metrics,
     genres: user.artists.slice(0, 4).map(item => ({ name: item.name, share: Math.round(item.count / Math.max(1, user.plays) * 100) })),
     strength: { title: `${ranked[0].name}: il tuo punto forte.`, text: `Questo indicatore è a ${ranked[0].value}/120 rispetto al profilo di riferimento.` },
     weakness: { title: `${ranked[2].name}: qui puoi crescere.`, text: `Questo indicatore è a ${ranked[2].value}/120 rispetto al profilo di riferimento.` },

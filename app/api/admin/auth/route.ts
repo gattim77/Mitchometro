@@ -1,4 +1,4 @@
-import { actor, safeOrigin } from '@/lib/server/spotify';
+import { actor, safeOrigin } from '@/lib/server/storage';
 import { adminAuthorized, adminConfigured, beginAdminSetup, clearSessionCookie, confirmAdminSetup, endAdminSession, loginAdmin, sessionCookie } from '@/lib/server/admin-auth';
 
 const noStore = { 'Cache-Control': 'no-store' };

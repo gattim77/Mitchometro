@@ -1,6 +1,6 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { validateHistoryProfile } from '@/lib/history-profile';
-import { database } from '@/lib/server/spotify';
+import { database } from '@/lib/server/storage';
 
 const headers = { 'Cache-Control': 'private, no-store' };
 

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { actor } from '@/lib/server/spotify';
+import { actor } from '@/lib/server/storage';
 import AdminClient from './admin-client';
 import AdminAuthClient from './admin-auth-client';
 import { adminAuthorized, adminConfigured } from '@/lib/server/admin-auth';

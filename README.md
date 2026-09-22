@@ -1,21 +1,13 @@
 # Mitchometro
 
-Private Italian music dashboard inspired by the supplied visual reference. The dashboard's scores, strengths, matching, and sample tracks still use synthetic data. Live listening analysis is deliberately separate from the Spotify connection because [Spotify Developer Policy III.13](https://developer.spotify.com/policy) restricts derived listening metrics and benchmarking.
+Mitchometro compares a visitor's uploaded Spotify extended listening history with an admin-uploaded, private master history. It scores the comparison on a 0–120 scale, with the master set to 100, and shows strengths, weaknesses, and artist overlap. Without both uploads it shows a clearly marked demo.
 
-## Spotify connection
+There is no Spotify account connection, OAuth, Client ID, or Spotify API access. Each person requests their extended listening history from Spotify, extracts the ZIP, and uploads the music JSON files. The browser aggregates plays from the last 28 days, 6 months, and 12 months and sends the summary rather than the original files. The master upload also retains up to 500 track titles and artists for a random song display. Users can replace or delete their uploaded summaries. Migration 0004 removes the former OAuth tables, stored tokens, app credentials, and summaries created from the recently played API while preserving uploaded histories.
 
-The site owner creates a Spotify Developer app at https://developer.spotify.com/dashboard and registers this exact redirect URI:
-
-`https://mitchometro-music-lab.marcog77.chatgpt.site/api/spotify/callback`
-
-Inside Mitchometro, the owner opens **Admin → Profilo master Spotify** and enters the app's client ID and secret. The secret is encrypted in D1; it must not be committed or pasted into chat. The owner can then connect the master profile. Each signed-in visitor can independently connect or disconnect their own Spotify profile; the dashboard connect action starts user OAuth directly after the developer app is configured. The master management control and all master data are restricted to the site's owner. The site remains private under its existing Sites access policy until the owner explicitly shares it.
-
-OAuth uses Authorization Code with PKCE, a single-use 10-minute state bound to the authenticated Sites visitor, and the minimal `user-read-private` scope. Access and refresh tokens are encrypted using the hosted `SPOTIFY_TOKEN_KEY`. Token refresh is handled server-side; invalid refresh tokens remove the connection. Disconnect deletes connection data. The app reads `/me` only during connection and never sends the master identity or tokens to a visitor.
-
-`SPOTIFY_REDIRECT_URI`, `MASTER_USER_EMAIL`, and the 32-byte `SPOTIFY_TOKEN_KEY` are hosted runtime values managed by Sites. They are not in source. D1 migrations create the connection, OAuth-attempt, developer-app settings, evaluation settings, and admin authentication tables. The server-gated `/admin` page is restricted to the single email configured as `MASTER_USER_EMAIL`. On first visit, that owner creates the fixed `admin` account password and enrolls a TOTP authenticator using a manual key. Later admin access requires both the owner identity and the password plus a fresh six-digit TOTP code. Passwords are PBKDF2-SHA256 hashed; TOTP secrets are encrypted in D1. Admin sessions use server-stored hashed tokens in Secure, HttpOnly cookies and expire after 12 hours. Failed logins lock for 15 minutes after five attempts. Admin APIs and master Spotify actions reject requests without the admin session. The owner can set demo band bonuses/maluses (each −10 to +10, total adjustment capped at ±20) and edit five sarcastic message variants in each of twelve score ranges. Every analysis response picks a variant at random, and saved messages from the earlier five-range format are carried forward. These settings never expose the master connection to ordinary visitors and do not score Spotify listening data. The app's `/privacy` page explains the collected data and deletion controls.
+The `/admin` page is restricted to the single Sites account whose email matches `MASTER_USER_EMAIL`. That owner sets a password for the fixed `admin` username and enrolls a TOTP authenticator. The existing `SPOTIFY_TOKEN_KEY` runtime secret remains in use solely as the encryption key for admin TOTP data; it is not used for any Spotify connection. Admin settings include artist bonuses and penalties and five editable sarcastic messages in each of twelve score bands.
 
 ## Development
 
-Node >=22.13. `npm run install:ci`, `npm run db:generate` after schema changes, `npm run dev`, `npm run build`. The local preview needs D1 migrations and equivalent development environment values to exercise OAuth.
+Node >=22.13. Install dependencies, apply D1 migrations, then run `node scripts/run-framework.mjs dev` or `node scripts/run-framework.mjs build`. The local preview needs the D1 binding and the admin runtime values to exercise admin authentication.
 
-Album covers are externally hosted Apple Music artwork; source links are in `lib/tracks.ts`. No audio is streamed in the app.
+Demo album artwork is externally hosted Apple Music artwork; source links are in `lib/tracks.ts`. The optional song search link opens Spotify's public search page without authenticating the visitor. No audio is streamed in the app.

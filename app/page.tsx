@@ -1,6 +1,6 @@
 import Dashboard from './dashboard';
 import { requireChatGPTUser } from './chatgpt-auth';
-import { actor } from '@/lib/server/spotify';
+import { actor } from '@/lib/server/storage';
 
 export const dynamic = 'force-dynamic';
 

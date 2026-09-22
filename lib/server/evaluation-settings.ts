@@ -1,4 +1,4 @@
-import { database } from './spotify';
+import { database } from './storage';
 
 export type BandRule = { name: string; adjustment: number };
 export type MessageVariant = { title: string; body: string };

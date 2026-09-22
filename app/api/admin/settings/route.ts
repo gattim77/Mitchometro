@@ -1,5 +1,5 @@
 import { adminAuthorized } from '@/lib/server/admin-auth';
-import { safeOrigin } from '@/lib/server/spotify';
+import { safeOrigin } from '@/lib/server/storage';
 import { getEvaluationSettings, saveEvaluationSettings, validateSettings } from '@/lib/server/evaluation-settings';
 
 const privateHeaders = { 'Cache-Control': 'no-store' };

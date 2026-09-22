@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { env } from 'cloudflare:workers';
-import { actor, database, decrypt, digest, encrypt, randomUrlSafe } from './spotify';
+import { actor, database, decrypt, digest, encrypt, randomUrlSafe } from './storage';
 import { adminPasswordHash } from './admin-password';
 
 export const ADMIN_COOKIE = '__Host-mitch-admin';

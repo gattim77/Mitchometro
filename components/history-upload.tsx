@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, FileUp, Trash2 } from 'lucide-react';
 import { profileFromFiles } from '@/lib/history-profile';
 
-type Status = { mine: { uploadedAt: number; plays: number; source: 'recent' | 'upload' } | null; masterReady: boolean; master?: { uploadedAt: number; plays: number; rotationReady: boolean } | null };
+type Status = { mine: { uploadedAt: number; plays: number } | null; masterReady: boolean; master?: { uploadedAt: number; plays: number; rotationReady: boolean } | null };
 
 export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'master'; onUpdated?: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
@@ -12,7 +12,7 @@ export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'mas
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const current = role === 'master' ? status?.master : status?.mine?.source === 'upload' ? status.mine : null;
+  const current = role === 'master' ? status?.master : status?.mine;
 
   async function refresh() {
     const response = await fetch('/api/history', { cache: 'no-store' });
