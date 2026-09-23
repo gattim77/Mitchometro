@@ -2,12 +2,12 @@ import { getEvaluationSettings } from '@/lib/server/evaluation-settings';
 import { analyze, analyzeHistory } from '@/lib/server/analysis';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { database } from '@/lib/server/storage';
-import { validateHistoryProfile, type Period } from '@/lib/history-profile';
+import { periods, validateHistoryProfile, type Period } from '@/lib/history-profile';
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return Response.json({ error: 'Accesso richiesto.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   const period = new URL(request.url).searchParams.get('period') ?? 'month';
-  if (!['month', 'semester', 'year'].includes(period)) return Response.json({ error: 'Periodo non valido.' }, { status: 400 });
+  if (!periods.includes(period as Period)) return Response.json({ error: 'Periodo non valido.' }, { status: 400 });
   try {
     const settings = await getEvaluationSettings();
     const db = database();
@@ -18,8 +18,17 @@ export async function GET(request: Request) {
     const parsedOwn = own && validateHistoryProfile(JSON.parse(own.summary));
     const ownProfile = parsedOwn?.source === 'recent' ? null : parsedOwn;
     const masterProfile = master && validateHistoryProfile(JSON.parse(master.summary));
-    const result = ownProfile && masterProfile && analyzeHistory(period as Period, ownProfile, masterProfile, settings);
-    return Response.json(result || analyze(period as Period, settings), { headers: { 'Cache-Control': 'no-store' } });
+    const requestedPeriod = period as Period;
+    const requestedIndex = periods.indexOf(requestedPeriod);
+    const availablePeriods = ownProfile && masterProfile
+      ? periods.filter(candidate => ownProfile.windows[candidate].plays > 0 && masterProfile.windows[candidate].plays > 0)
+      : [];
+    const effectivePeriod = availablePeriods.includes(requestedPeriod)
+      ? requestedPeriod
+      : availablePeriods.find(candidate => periods.indexOf(candidate) > requestedIndex)
+        ?? [...availablePeriods].reverse().find(candidate => periods.indexOf(candidate) < requestedIndex);
+    const result = effectivePeriod && ownProfile && masterProfile && analyzeHistory(effectivePeriod, ownProfile, masterProfile, settings);
+    return Response.json(result ? { ...result, ...(effectivePeriod !== requestedPeriod ? { periodFallbackFrom: requestedPeriod } : {}) } : analyze(requestedPeriod, settings), { headers: { 'Cache-Control': 'no-store' } });
   }
   catch (error) { console.error('Analysis settings unavailable', error); return Response.json({ error: 'Analisi non disponibile.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } }); }
 }
