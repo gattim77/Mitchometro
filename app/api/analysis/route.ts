@@ -21,14 +21,17 @@ export async function GET(request: Request) {
     const requestedPeriod = period as Period;
     const requestedIndex = periods.indexOf(requestedPeriod);
     const availablePeriods = ownProfile && masterProfile
-      ? periods.filter(candidate => ownProfile.windows[candidate].plays > 0 && masterProfile.windows[candidate].plays > 0)
+      ? periods.filter(candidate => (candidate !== 'forever' || (ownProfile.lifetimeReady && masterProfile.lifetimeReady)) && ownProfile.windows[candidate].plays > 0 && masterProfile.windows[candidate].plays > 0)
       : [];
     const effectivePeriod = availablePeriods.includes(requestedPeriod)
       ? requestedPeriod
       : availablePeriods.find(candidate => periods.indexOf(candidate) > requestedIndex)
         ?? [...availablePeriods].reverse().find(candidate => periods.indexOf(candidate) < requestedIndex);
     const result = effectivePeriod && ownProfile && masterProfile && analyzeHistory(effectivePeriod, ownProfile, masterProfile, settings);
-    return Response.json(result ? { ...result, ...(effectivePeriod !== requestedPeriod ? { periodFallbackFrom: requestedPeriod } : {}) } : analyze(requestedPeriod, settings), { headers: { 'Cache-Control': 'no-store' } });
+    const periodFallbackReason = requestedPeriod === 'forever' && effectivePeriod !== 'forever' && ownProfile && masterProfile && (!ownProfile.lifetimeReady || !masterProfile.lifetimeReady)
+      ? 'reload-history'
+      : undefined;
+    return Response.json(result ? { ...result, ...(effectivePeriod !== requestedPeriod ? { periodFallbackFrom: requestedPeriod, ...(periodFallbackReason ? { periodFallbackReason } : {}) } : {}) } : analyze(requestedPeriod, settings), { headers: { 'Cache-Control': 'no-store' } });
   }
   catch (error) { console.error('Analysis settings unavailable', error); return Response.json({ error: 'Analisi non disponibile.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } }); }
 }

@@ -1,4 +1,4 @@
-export const periods = ['month', 'semester', 'year'] as const;
+export const periods = ['month', 'year', 'forever'] as const;
 export type Period = (typeof periods)[number];
 export type ArtistCount = { name: string; count: number };
 export type RotationTrack = { artist: string; title: string };
@@ -9,14 +9,15 @@ export type HistoryWindow = {
   artists: ArtistCount[];
 };
 export type HistoryProfile = {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   windows: Record<Period, HistoryWindow>;
+  lifetimeReady: boolean;
   rotationTracks?: RotationTrack[];
   source?: 'recent' | 'upload';
 };
 
 const day = 86_400_000;
-const windows: Record<Period, number> = { month: 28 * day, semester: 183 * day, year: 365 * day };
+const windowDurations = { month: 30 * day, year: 365 * day } as const;
 
 export async function profileFromFiles(files: File[], includeRotationTracks = false): Promise<HistoryProfile> {
   if (!files.length || files.length > 200) throw new Error('Seleziona fino a 200 file JSON della cronologia.');
@@ -44,7 +45,7 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
       const ms = typeof row.ms_played === 'number' ? row.ms_played : row.msPlayed;
       if (typeof artist !== 'string' || typeof track !== 'string' || typeof time !== 'string' || typeof ms !== 'number') continue;
       const playedAt = Date.parse(/^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(time) ? `${time.replace(' ', 'T')}:00Z` : time);
-      if (!Number.isFinite(playedAt) || playedAt > now + day || playedAt < now - windows.year || ms < 30_000) continue;
+      if (!Number.isFinite(playedAt) || playedAt > now + day || ms < 30_000) continue;
       const artistName = artist.normalize('NFKC').trim().replace(/\s+/g, ' ').slice(0, 100);
       const trackName = track.normalize('NFKC').trim().replace(/\s+/g, ' ').slice(0, 150);
       if (!artistName || !trackName) continue;
@@ -61,7 +62,7 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
         else rotation.set(trackKey, { artist: artistName, title: trackName, count: 1 });
       }
       for (const period of periods) {
-        if (playedAt < now - windows[period]) continue;
+        if (period !== 'forever' && playedAt < now - windowDurations[period]) continue;
         const bucket = buckets[period];
         bucket.plays++;
         bucket.tracks.add(trackKey);
@@ -72,10 +73,11 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
     }
   }
   if (!foundExtended) throw new Error('Seleziona i JSON della Cronologia di ascolto estesa: la cronologia standard contiene solo l’ultimo anno.');
-  if (!found) throw new Error('Non abbiamo trovato brani ascoltati nell’ultimo anno. Seleziona i JSON della cronologia di ascolto.');
+  if (!found) throw new Error('Non abbiamo trovato brani validi nella cronologia. Seleziona tutti i JSON della cronologia di ascolto estesa.');
   return {
-    version: includeRotationTracks ? 2 : 1,
+    version: 3,
     source: 'upload',
+    lifetimeReady: true,
     windows: Object.fromEntries(periods.map(period => {
       const bucket = buckets[period];
       return [period, {
@@ -92,10 +94,11 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
 export function validateHistoryProfile(input: unknown): HistoryProfile | null {
   if (!input || typeof input !== 'object') return null;
   const source = input as Record<string, unknown>;
-  if ((source.version !== 1 && source.version !== 2) || !source.windows || typeof source.windows !== 'object') return null;
+  if ((source.version !== 1 && source.version !== 2 && source.version !== 3) || !source.windows || typeof source.windows !== 'object') return null;
   const windows = {} as Record<Period, HistoryWindow>;
   for (const period of periods) {
-    const raw = (source.windows as Record<string, unknown>)[period];
+    const rawWindows = source.windows as Record<string, unknown>;
+    const raw = source.version !== 3 && period === 'forever' ? rawWindows.year : rawWindows[period];
     if (!raw || typeof raw !== 'object') return null;
     const value = raw as Record<string, unknown>;
     if (!Number.isInteger(value.plays) || (value.plays as number) < 0 || (value.plays as number) > 1_000_000 ||
@@ -119,10 +122,13 @@ export function validateHistoryProfile(input: unknown): HistoryProfile | null {
     if (covered > (value.plays as number) || artists.length > (value.uniqueArtists as number)) return null;
     windows[period] = { plays: value.plays as number, uniqueArtists: value.uniqueArtists as number, uniqueTracks: value.uniqueTracks as number, artists };
   }
-  if (windows.month.plays > windows.semester.plays || windows.semester.plays > windows.year.plays) return null;
+  if (windows.month.plays > windows.year.plays || windows.year.plays > windows.forever.plays) return null;
   const profileSource = source.source === 'recent' || source.source === 'upload' ? source.source : undefined;
-  if (source.version === 1) return { version: 1, windows, ...(profileSource ? { source: profileSource } : {}) };
-  if (!Array.isArray(source.rotationTracks) || source.rotationTracks.length < 1 || source.rotationTracks.length > 500 || source.rotationTracks.length > windows.year.uniqueTracks) return null;
+  const lifetimeReady = source.version === 3 && source.lifetimeReady === true;
+  if (source.version === 1 || (source.version === 3 && source.rotationTracks === undefined)) {
+    return { version: source.version, windows, lifetimeReady, ...(profileSource ? { source: profileSource } : {}) };
+  }
+  if (!Array.isArray(source.rotationTracks) || source.rotationTracks.length < 1 || source.rotationTracks.length > 500 || source.rotationTracks.length > windows.forever.uniqueTracks) return null;
   const rotationTracks: RotationTrack[] = [];
   const trackKeys = new Set<string>();
   for (const item of source.rotationTracks) {
@@ -134,5 +140,5 @@ export function validateHistoryProfile(input: unknown): HistoryProfile | null {
     trackKeys.add(key);
     rotationTracks.push({ artist: track.artist, title: track.title });
   }
-  return { version: 2, windows, rotationTracks, ...(profileSource ? { source: profileSource } : {}) };
+  return { version: source.version, windows, lifetimeReady, rotationTracks, ...(profileSource ? { source: profileSource } : {}) };
 }

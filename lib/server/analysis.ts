@@ -4,10 +4,10 @@ import type { HistoryProfile, HistoryWindow, Period } from '@/lib/history-profil
 const reference = { variety: 12, discovery: 0.4, identity: 5, genres: [0.35, 0.30, 0.20, 0.15] };
 const samples = {
   month: { variety: 10, discovery: 0.29, identity: 5.2, genres: [0.50, 0.27, 0.15, 0.08], artists: 48, tracks: 126 },
-  semester: { variety: 13, discovery: 0.38, identity: 5.5, genres: [0.40, 0.30, 0.19, 0.11], artists: 137, tracks: 482 },
   year: { variety: 14, discovery: 0.44, identity: 5.8, genres: [0.36, 0.30, 0.20, 0.14], artists: 219, tracks: 864 },
+  forever: { variety: 16, discovery: 0.47, identity: 6.1, genres: [0.34, 0.29, 0.21, 0.16], artists: 486, tracks: 2410 },
 };
-const demoArtists = { month: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez'], semester: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez', 'Daft Punk'], year: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez', 'Daft Punk', 'Måneskin'] };
+const demoArtists = { month: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez'], year: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez', 'Daft Punk', 'Måneskin'], forever: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez', 'Daft Punk', 'Måneskin', 'Radiohead'] };
 export function analyze(period: keyof typeof samples, settings: EvaluationSettings) {
   const user = samples[period];
   const match = Math.round(100 * user.genres.reduce((sum, value, i) => sum + Math.min(value, reference.genres[i]), 0));
