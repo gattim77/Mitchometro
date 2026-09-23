@@ -136,7 +136,6 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 }
 async function sendTransferEmail(email: string, link: string) {
-  if (!env.RESEND_API_KEY || !env.ADMIN_EMAIL_FROM) throw new Error('ADMIN_EMAIL_NOT_CONFIGURED');
   const safeLink = escapeHtml(link);
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -161,12 +160,16 @@ export async function requestAdminTransfer(ownerId: string, currentEmail: string
     VALUES (1, ?, ?, ?, NULL, NULL, NULL, ?, 0) ON CONFLICT(id) DO UPDATE SET token_hash = excluded.token_hash, email = excluded.email,
     requested_by = excluded.requested_by, password_salt = NULL, password_hash = NULL, totp_secret = NULL, expires_at = excluded.expires_at, attempts = 0`)
     .bind(tokenHash, email, ownerId, Date.now() + TRANSFER_MS).run();
-  try { await sendTransferEmail(email, `${origin}/admin/transfer?token=${encodeURIComponent(token)}`); }
-  catch (error) {
-    await database().prepare('DELETE FROM admin_transfers WHERE token_hash = ?').bind(tokenHash).run();
-    throw error;
+  const link = `${origin}/admin/transfer?token=${encodeURIComponent(token)}`;
+  if (env.RESEND_API_KEY && env.ADMIN_EMAIL_FROM) {
+    try { await sendTransferEmail(email, link); }
+    catch (error) {
+      await database().prepare('DELETE FROM admin_transfers WHERE token_hash = ?').bind(tokenHash).run();
+      throw error;
+    }
+    return { ok: true as const, email, delivery: 'email' as const };
   }
-  return { ok: true as const, email };
+  return { ok: true as const, email, delivery: 'manual' as const, link };
 }
 async function activeTransfer(token: unknown, email: string) {
   if (!validTransferToken(token)) return null;

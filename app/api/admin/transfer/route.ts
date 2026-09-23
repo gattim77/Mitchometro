@@ -38,9 +38,6 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Azione non valida.' }, { status: 400, headers });
   } catch (error) {
     console.error('Admin transfer failed', error);
-    const message = error instanceof Error && error.message === 'ADMIN_EMAIL_NOT_CONFIGURED'
-      ? 'Invio email non configurato. Aggiungi il servizio email prima di nominare il nuovo Re.'
-      : 'Operazione non riuscita. Riprova.';
-    return Response.json({ error: message }, { status: 503, headers });
+    return Response.json({ error: 'Invio non riuscito. Controlla la configurazione email e riprova.' }, { status: 503, headers });
   }
 }
