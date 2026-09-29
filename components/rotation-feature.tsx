@@ -43,7 +43,7 @@ export default function RotationFeature({ revision, selected, setSelected, saved
   return <section className="panel feature">
     <div className="section-top"><h2><span className="mint"><AudioLines size={20}/></span> Dalla playlist sacra del Maestro</h2><span className="micro-label">{masterTrack ? 'BENEDIZIONE DI SUA SANTITÀ' : 'RELIQUIE DIMOSTRATIVE'}</span></div>
     {masterTrack ? <>
-      <div className="featured-song">
+      <div className="featured-song master-featured-song">
         <div className="master-art" aria-hidden="true"><AudioLines size={58}/><span>MITCHOMETRO<br/>MASTER ROTATION</span></div>
         <div className="song-info"><span className="tag">SCELTA CONSACRATA</span><h3>{masterTrack.title}</h3><p className="artist">{masterTrack.artist}</p><p>Una reliquia dal sacro canone privato di Mitch.</p><div className="song-actions"><a className="play-link" href={`https://open.spotify.com/search/${encodeURIComponent(`${masterTrack.artist} ${masterTrack.title}`)}`} target="_blank" rel="noreferrer"><Disc3 size={17}/> Cerca su Spotify <ArrowUpRight size={15}/></a></div></div>
       </div>

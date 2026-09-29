@@ -9,6 +9,38 @@ const samples = {
 };
 const demoArtists = { month: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez'], year: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez', 'Daft Punk', 'Måneskin'], forever: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez', 'Daft Punk', 'Måneskin', 'Radiohead'] };
 const mitchTitles = ['Sua Santità del Punk', 'Il Sommo Maestro', 'Il Gran Sacerdote del Volume', 'L’Oracolo del Ritornello'];
+const artistGenres: Record<string, string> = {
+  'arctic monkeys': 'Indie / Rock', 'blur': 'Indie / Rock', 'fontaines d.c.': 'Indie / Rock', 'gigi perez': 'Indie / Rock',
+  'getdown services': 'Indie / Rock', 'oasis': 'Indie / Rock', 'radiohead': 'Indie / Rock', 'the scratch': 'Indie / Rock',
+  'måneskin': 'Rock / Punk', 'maneskin': 'Rock / Punk', 'green day': 'Rock / Punk', 'idles': 'Rock / Punk',
+  'nirvana': 'Rock / Punk', 'ramones': 'Rock / Punk', 'the clash': 'Rock / Punk', 'the cure': 'Rock / Punk',
+  'daft punk': 'Elettronica', 'depeche mode': 'Elettronica', 'kraftwerk': 'Elettronica', 'señor coconut': 'Elettronica',
+  'the chemical brothers': 'Elettronica', 'the prodigy': 'Elettronica',
+  'beyoncé': 'Pop / R&B', 'billie eilish': 'Pop / R&B', 'dua lipa': 'Pop / R&B', 'prince': 'Pop / R&B',
+  'sza': 'Pop / R&B', 'teddy swims': 'Pop / R&B', 'the weeknd': 'Pop / R&B',
+  'buena vista social club': 'Jazz / Latin', 'miles davis': 'Jazz / Latin', 'nina simone': 'Jazz / Latin',
+  'bad bunny': 'Hip hop / Urban', 'kendrick lamar': 'Hip hop / Urban', 'run the jewels': 'Hip hop / Urban',
+  'bob dylan': 'Folk / Cantautorato', 'bruce springsteen': 'Folk / Cantautorato', 'de andré': 'Folk / Cantautorato',
+  'fabrizio de andré': 'Folk / Cantautorato', 'lucio dalla': 'Folk / Cantautorato',
+};
+
+function summarizeGenres(window: HistoryWindow) {
+  const counts = new Map<string, number>();
+  let classified = 0;
+  for (const artist of window.artists) {
+    const genre = artistGenres[artist.name.toLocaleLowerCase('it')];
+    if (!genre) continue;
+    classified += artist.count;
+    counts.set(genre, (counts.get(genre) ?? 0) + artist.count);
+  }
+  const unclassified = Math.max(0, window.plays - classified);
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const visible = ranked.slice(0, 3);
+  const remaining = ranked.slice(3).reduce((sum, [, count]) => sum + count, 0) + unclassified;
+  if (remaining) visible.push(['Altri / non classificati', remaining]);
+  return visible.map(([name, count]) => ({ name, share: Math.round(count / Math.max(1, window.plays) * 100) }));
+}
+
 function mitchVerdict(message: MessageVariant, score: number): MessageVariant {
   const judge = mitchTitles[Math.floor(score / 10) % mitchTitles.length];
   return { title: `${judge} ha sentenziato: ${message.title}`, body: `Mitch ti giudica: ${message.body}` };
@@ -77,7 +109,7 @@ export function analyzeHistory(period: Period, userProfile: HistoryProfile, mast
   const ranked = metrics.slice(0, 3).sort((a, b) => b.value - a.value);
   return {
     mode: 'real' as const, period, score, scoreMessage, match, artists: user.uniqueArtists, tracks: user.uniqueTracks, metrics,
-    genres: user.artists.slice(0, 4).map(item => ({ name: item.name, share: Math.round(item.count / Math.max(1, user.plays) * 100) })),
+    genres: summarizeGenres(user),
     strength: { title: `${ranked[0].name}: il Maestro concede la grazia.`, text: `Sua Santità del Punk decreta ${ranked[0].value}/120 rispetto al proprio sacro canone.` },
     weakness: { title: `${ranked[2].name}: capo d’accusa principale.`, text: `Il Sommo Maestro assegna ${ranked[2].value}/120 e ordina un’immediata revisione del repertorio.` },
   };
