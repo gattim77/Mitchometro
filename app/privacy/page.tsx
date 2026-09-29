@@ -7,8 +7,8 @@ export default function Privacy() {
     <Link href="/">← Mitchometro</Link>
     <h1>Privacy</h1>
     <p>Carichi i file JSON della cronologia di ascolto estesa che hai scaricato dal tuo account Spotify. Mitchometro non collega il tuo account e non chiede la tua password Spotify.</p>
-    <p>Il browser legge i JSON e invia soltanto conteggi per artista e indicatori aggregati per gli ultimi 30 giorni, l’ultimo anno e l’intera cronologia. Non salviamo i file originali, i dati su IP e dispositivo presenti nei file o la cronologia dei singoli brani degli utenti.</p>
-    <p>Conserviamo il riepilogo sul server, associato al tuo accesso a Mitchometro. Puoi sostituirlo o eliminarlo dalle opzioni di analisi. L’admin carica un riferimento separato: oltre ai conteggi, conserviamo fino a 500 titoli e artisti tra i suoi brani più ascoltati. La dashboard mostra un brano casuale alla volta. L’identità, i conteggi e il profilo completo del master non vengono restituiti agli altri utenti.</p>
+    <p>Il browser legge i JSON e invia conteggi per artista, indicatori aggregati e fino a 500 titoli con i relativi artisti tra i brani più ascoltati. Questi ultimi servono esclusivamente a calcolare quanti brani condividi con il Maestro. Non salviamo i file originali, i dati su IP e dispositivo presenti nei file o la sequenza cronologica dei singoli ascolti.</p>
+    <p>Conserviamo il riepilogo sul server, associato al tuo accesso a Mitchometro. Puoi sostituirlo o eliminarlo dalle opzioni di analisi. L’admin carica un riferimento separato con gli stessi dati aggregati. La dashboard può mostrare un brano casuale del Maestro alla volta; l’identità, i conteggi e il suo profilo completo non vengono restituiti agli altri utenti.</p>
     <p>Le copertine dei brani dimostrativi vengono caricate da Apple Music, che riceve la normale richiesta del browser. I brani salvati nella demo rimangono nella memoria della sessione e spariscono quando ricarichi la pagina.</p>
     <p>Per domande o richieste sui dati, contatta il proprietario del sito tramite il canale con cui hai ricevuto il link.</p>
   </main>;

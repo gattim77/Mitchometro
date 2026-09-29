@@ -29,6 +29,7 @@ export function analyze(period: keyof typeof samples, settings: EvaluationSettin
   const level = settings.messages.find(message => score >= message.min && score <= message.max)!;
   const scoreMessage = mitchVerdict(level.variants[Math.floor(Math.random() * level.variants.length)], score);
   return { mode: 'demo' as const, period, score, scoreMessage, match, artists: user.artists, tracks: user.tracks, metrics,
+    comparison: { sharedArtists: 18, sharedTracks: 34, userSharedPlayShare: 46, masterSharedPlayShare: 41, userOnlyArtists: 30, masterOnlyArtists: 22, sharedArtistNames: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Daft Punk'] },
     strength: { title: 'Il Maestro annuisce, appena.', text: 'La tua identità musicale è abbastanza netta da ottenere un cenno di approvazione dal Sommo Giudice.' },
     weakness: { title: period === 'month' ? 'Sua Santità esige più coraggio.' : 'L’Oracolo pretende nuove prospettive.', text: period === 'month' ? 'La scoperta è il capo d’accusa principale: osa un artista mai ascoltato e forse Mitch sarà clemente.' : 'Il repertorio si è ampliato, ma il Maestro ordina di alternare i preferiti a territori meno battuti.' }
   };
@@ -50,6 +51,32 @@ function affinity(user: HistoryWindow, master: HistoryWindow) {
   const reference = new Map(master.artists.map(item => [item.name.toLocaleLowerCase('it'), item.count / masterTotal]));
   return Math.round(100 * user.artists.reduce((sum, item) =>
     sum + Math.min(item.count / userTotal, reference.get(item.name.toLocaleLowerCase('it')) ?? 0), 0));
+}
+
+function comparison(user: HistoryWindow, master: HistoryWindow, userProfile: HistoryProfile, masterProfile: HistoryProfile) {
+  const masterArtists = new Map(master.artists.map(item => [item.name.toLocaleLowerCase('it'), item]));
+  const shared = user.artists.filter(item => masterArtists.has(item.name.toLocaleLowerCase('it')));
+  const userSharedPlays = shared.reduce((sum, item) => sum + item.count, 0);
+  const masterSharedPlays = shared.reduce((sum, item) => sum + (masterArtists.get(item.name.toLocaleLowerCase('it'))?.count ?? 0), 0);
+  const sharedArtistNames = [...shared].sort((a, b) => {
+    const score = (item: typeof a) => item.count / Math.max(1, user.plays) + (masterArtists.get(item.name.toLocaleLowerCase('it'))?.count ?? 0) / Math.max(1, master.plays);
+    return score(b) - score(a);
+  }).slice(0, 6).map(item => item.name);
+  const userTracks = userProfile.rotationTracks;
+  const masterTracks = masterProfile.rotationTracks;
+  const sharedTracks = userTracks?.length && masterTracks?.length ? (() => {
+    const masterKeys = new Set(masterTracks.map(track => `${track.artist}\u0000${track.title}`.toLocaleLowerCase('it')));
+    return userTracks.reduce((sum, track) => sum + (masterKeys.has(`${track.artist}\u0000${track.title}`.toLocaleLowerCase('it')) ? 1 : 0), 0);
+  })() : null;
+  return {
+    sharedArtists: shared.length,
+    sharedTracks,
+    userSharedPlayShare: Math.round(userSharedPlays / Math.max(1, user.plays) * 100),
+    masterSharedPlayShare: Math.round(masterSharedPlays / Math.max(1, master.plays) * 100),
+    userOnlyArtists: Math.max(0, user.uniqueArtists - shared.length),
+    masterOnlyArtists: Math.max(0, master.uniqueArtists - shared.length),
+    sharedArtistNames,
+  };
 }
 
 export function analyzeHistory(period: Period, userProfile: HistoryProfile, masterProfile: HistoryProfile, settings: EvaluationSettings) {
@@ -76,6 +103,7 @@ export function analyzeHistory(period: Period, userProfile: HistoryProfile, mast
   const ranked = metrics.slice(0, 3).sort((a, b) => b.value - a.value);
   return {
     mode: 'real' as const, period, score, scoreMessage, match, artists: user.uniqueArtists, tracks: user.uniqueTracks, metrics,
+    comparison: comparison(user, master, userProfile, masterProfile),
     strength: { title: `${ranked[0].name}: il Maestro concede la grazia.`, text: `Sua Santità del Punk decreta ${ranked[0].value}/120 rispetto al proprio sacro canone.` },
     weakness: { title: `${ranked[2].name}: capo d’accusa principale.`, text: `Il Sommo Maestro assegna ${ranked[2].value}/120 e ordina un’immediata revisione del repertorio.` },
   };

@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   const profile = validateHistoryProfile(payload?.profile);
   if (!profile || profile.source !== 'upload') return Response.json({ error: 'Carica una cronologia esportata valida.' }, { status: 400, headers });
   if (role === 'master' && !profile.rotationTracks?.length) return Response.json({ error: 'Ricarica i file della cronologia per attivare la rotazione dei brani.' }, { status: 400, headers });
-  const storedProfile = role === 'user' ? { version: 3 as const, source: 'upload' as const, windows: profile.windows, lifetimeReady: profile.lifetimeReady } : profile;
+  const storedProfile = profile;
   const plays = profile.windows.forever.plays;
   try {
     await database().prepare(`INSERT INTO listening_profiles (owner_id, role, summary, uploaded_at, plays) VALUES (?, ?, ?, ?, ?)
