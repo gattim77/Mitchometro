@@ -53,6 +53,29 @@ function affinity(user: HistoryWindow, master: HistoryWindow) {
     sum + Math.min(item.count / userTotal, reference.get(item.name.toLocaleLowerCase('it')) ?? 0), 0));
 }
 
+function countSharedFingerprints(userData: string, masterData: string) {
+  const decode = (data: string) => Uint8Array.from(atob(data), character => character.charCodeAt(0));
+  const user = decode(userData);
+  const master = decode(masterData);
+  let userIndex = 0;
+  let masterIndex = 0;
+  let shared = 0;
+  const compare = (left: number, right: number) => {
+    for (let byte = 0; byte < 8; byte++) {
+      const difference = user[left + byte] - master[right + byte];
+      if (difference) return difference;
+    }
+    return 0;
+  };
+  while (userIndex < user.length && masterIndex < master.length) {
+    const order = compare(userIndex, masterIndex);
+    if (order === 0) { shared++; userIndex += 8; masterIndex += 8; }
+    else if (order < 0) userIndex += 8;
+    else masterIndex += 8;
+  }
+  return shared;
+}
+
 function comparison(user: HistoryWindow, master: HistoryWindow, userProfile: HistoryProfile, masterProfile: HistoryProfile) {
   const masterArtists = new Map(master.artists.map(item => [item.name.toLocaleLowerCase('it'), item]));
   const shared = user.artists.filter(item => masterArtists.has(item.name.toLocaleLowerCase('it')));
@@ -62,12 +85,8 @@ function comparison(user: HistoryWindow, master: HistoryWindow, userProfile: His
     const score = (item: typeof a) => item.count / Math.max(1, user.plays) + (masterArtists.get(item.name.toLocaleLowerCase('it'))?.count ?? 0) / Math.max(1, master.plays);
     return score(b) - score(a);
   }).slice(0, 6).map(item => item.name);
-  const userTracks = userProfile.rotationTracks;
-  const masterTracks = masterProfile.rotationTracks;
-  const sharedTracks = userTracks?.length && masterTracks?.length ? (() => {
-    const masterKeys = new Set(masterTracks.map(track => `${track.artist}\u0000${track.title}`.toLocaleLowerCase('it')));
-    return userTracks.reduce((sum, track) => sum + (masterKeys.has(`${track.artist}\u0000${track.title}`.toLocaleLowerCase('it')) ? 1 : 0), 0);
-  })() : null;
+  const sharedTracks = userProfile.trackFingerprints && masterProfile.trackFingerprints
+    ? countSharedFingerprints(userProfile.trackFingerprints.data, masterProfile.trackFingerprints.data) : null;
   return {
     sharedArtists: shared.length,
     sharedTracks,

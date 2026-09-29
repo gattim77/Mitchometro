@@ -32,9 +32,9 @@ export async function POST(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return Response.json({ error: 'Accesso richiesto.' }, { status: 401, headers });
   if (!safeOrigin(request)) return Response.json({ error: 'Richiesta non valida.' }, { status: 403, headers });
-  if (Number(request.headers.get('content-length')) > 1_500_000) return Response.json({ error: 'Troppi artisti nel file. Seleziona un periodo più breve.' }, { status: 413, headers });
+  if (Number(request.headers.get('content-length')) > 20_000_000) return Response.json({ error: 'La cronologia supera il limite tecnico di caricamento.' }, { status: 413, headers });
   const text = await request.text();
-  if (text.length > 1_500_000) return Response.json({ error: 'Troppi artisti nel file. Seleziona un periodo più breve.' }, { status: 413, headers });
+  if (text.length > 20_000_000) return Response.json({ error: 'La cronologia supera il limite tecnico di caricamento.' }, { status: 413, headers });
   const payload = await Promise.resolve().then(() => JSON.parse(text || 'null')).catch(() => null) as { role?: unknown; profile?: unknown } | null;
   const role = payload?.role;
   if (role !== 'user' && role !== 'master') return Response.json({ error: 'Ruolo non valido.' }, { status: 400, headers });
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   const profile = validateHistoryProfile(payload?.profile);
   if (!profile || profile.source !== 'upload') return Response.json({ error: 'Carica una cronologia esportata valida.' }, { status: 400, headers });
   if (role === 'master' && !profile.rotationTracks?.length) return Response.json({ error: 'Ricarica i file della cronologia per attivare la rotazione dei brani.' }, { status: 400, headers });
-  const storedProfile = profile;
+  const storedProfile = role === 'user' ? { ...profile, rotationTracks: undefined } : profile;
   const plays = profile.windows.forever.plays;
   try {
     await database().prepare(`INSERT INTO listening_profiles (owner_id, role, summary, uploaded_at, plays) VALUES (?, ?, ?, ?, ?)

@@ -29,7 +29,7 @@ export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'mas
   async function upload() {
     setBusy(true); setError(''); setNotice('');
     try {
-      const profile = await profileFromFiles(files, true);
+      const profile = await profileFromFiles(files, role === 'master');
       const response = await fetch('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role, profile }) });
       const result = await response.json() as { error?: string; plays?: number };
       if (!response.ok) throw new Error(result.error || 'Caricamento non riuscito.');
@@ -57,7 +57,7 @@ export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'mas
       <li>Richiedi <strong>Cronologia di ascolto estesa</strong> (intero account), non la cronologia standard dell’ultimo anno.</li>
       <li>Quando Spotify ti invia lo ZIP, estrailo e seleziona qui tutti i file JSON della cronologia musicale.</li>
     </ol>
-    <p className="history-help">Presenta tutti i JSON della cronologia estesa. Il tribunale esamina tre periodi: ultimi 30 giorni, ultimo anno e intera cronologia. Escludiamo podcast e riproduzioni sotto i 30 secondi. Conserviamo i conteggi degli artisti e fino a 500 titoli con i relativi artisti per calcolare i brani condivisi. {role === 'master' ? 'Una reliquia del Maestro alla volta può apparire nella dashboard; il canone completo resta privato.' : 'Gli altri utenti non possono vedere il tuo elenco.'} IP, dispositivo e file originali non vengono salvati.</p>
+    <p className="history-help">Presenta tutti i JSON della cronologia estesa. Il tribunale esamina tre periodi: ultimi 30 giorni, ultimo anno e intera cronologia. Escludiamo podcast e riproduzioni sotto i 30 secondi. Per confrontare l’intero catalogo, ogni brano unico viene trasformato nel browser in un’impronta tecnica non leggibile. {role === 'master' ? 'Solo per la rotazione, custodiamo inoltre fino a 500 titoli del Maestro; una reliquia alla volta può apparire nella dashboard.' : 'I titoli della tua cronologia non vengono inviati al server.'} IP, dispositivo e file originali non vengono salvati.</p>
     <label className="history-file-label"><FileUp size={18}/> Seleziona le prove in formato JSON<input type="file" accept=".json,application/json" multiple onChange={event => setFiles([...event.target.files ?? []])} /></label>
     {files.length > 0 && <p className="history-selected">{files.length} {files.length === 1 ? 'file selezionato' : 'file selezionati'}: {files.map(file => file.name).join(', ')}</p>}
     <div className="history-actions"><button className="connect" type="button" disabled={busy || !files.length} onClick={upload}>{busy ? 'Il Maestro esamina…' : current ? 'Sostituisci le prove' : 'Presenta le prove'}</button>{current && <button className="history-delete" type="button" disabled={busy} onClick={remove}><Trash2 size={15}/> Ritira le prove</button>}</div>

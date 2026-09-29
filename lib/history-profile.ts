@@ -2,6 +2,7 @@ export const periods = ['month', 'year', 'forever'] as const;
 export type Period = (typeof periods)[number];
 export type ArtistCount = { name: string; count: number };
 export type RotationTrack = { artist: string; title: string };
+export type TrackFingerprints = { encoding: 'fnv1a64-be-base64-v1'; count: number; data: string };
 export type HistoryWindow = {
   plays: number;
   uniqueArtists: number;
@@ -9,15 +10,39 @@ export type HistoryWindow = {
   artists: ArtistCount[];
 };
 export type HistoryProfile = {
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 4;
   windows: Record<Period, HistoryWindow>;
   lifetimeReady: boolean;
   rotationTracks?: RotationTrack[];
+  trackFingerprints?: TrackFingerprints;
   source?: 'recent' | 'upload';
 };
 
 const day = 86_400_000;
 const windowDurations = { month: 30 * day, year: 365 * day } as const;
+const fnvOffset = BigInt('14695981039346656037');
+const fnvPrime = BigInt('1099511628211');
+const byteMask = BigInt(255);
+
+function fingerprintTrack(value: string) {
+  let hash = fnvOffset;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= BigInt(value.charCodeAt(index));
+    hash = BigInt.asUintN(64, hash * fnvPrime);
+  }
+  return hash;
+}
+
+function encodeTrackFingerprints(values: Set<string>): TrackFingerprints {
+  const hashes = [...new Set([...values].map(fingerprintTrack))].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  const bytes = new Uint8Array(hashes.length * 8);
+  hashes.forEach((hash, index) => {
+    for (let byte = 0; byte < 8; byte++) bytes[index * 8 + byte] = Number(hash >> BigInt((7 - byte) * 8) & byteMask);
+  });
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 32_768) binary += String.fromCharCode(...bytes.subarray(offset, offset + 32_768));
+  return { encoding: 'fnv1a64-be-base64-v1', count: hashes.length, data: btoa(binary) };
+}
 
 export async function profileFromFiles(files: File[], includeRotationTracks = false): Promise<HistoryProfile> {
   if (!files.length || files.length > 200) throw new Error('Seleziona fino a 200 file JSON della cronologia.');
@@ -75,7 +100,7 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
   if (!foundExtended) throw new Error('Seleziona i JSON della Cronologia di ascolto estesa: la cronologia standard contiene solo l’ultimo anno.');
   if (!found) throw new Error('Non abbiamo trovato brani validi nella cronologia. Seleziona tutti i JSON della cronologia di ascolto estesa.');
   return {
-    version: 3,
+    version: 4,
     source: 'upload',
     lifetimeReady: true,
     windows: Object.fromEntries(periods.map(period => {
@@ -87,6 +112,7 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
         artists: [...bucket.artists.values()].sort((a, b) => b.count - a.count).slice(0, 4_000),
       }];
     })) as Record<Period, HistoryWindow>,
+    trackFingerprints: encodeTrackFingerprints(buckets.forever.tracks),
     ...(includeRotationTracks ? { rotationTracks: [...rotation.values()].sort((a, b) => b.count - a.count).slice(0, 500).map(({ artist, title }) => ({ artist, title })) } : {}),
   };
 }
@@ -94,11 +120,11 @@ export async function profileFromFiles(files: File[], includeRotationTracks = fa
 export function validateHistoryProfile(input: unknown): HistoryProfile | null {
   if (!input || typeof input !== 'object') return null;
   const source = input as Record<string, unknown>;
-  if ((source.version !== 1 && source.version !== 2 && source.version !== 3) || !source.windows || typeof source.windows !== 'object') return null;
+  if ((source.version !== 1 && source.version !== 2 && source.version !== 3 && source.version !== 4) || !source.windows || typeof source.windows !== 'object') return null;
   const windows = {} as Record<Period, HistoryWindow>;
   for (const period of periods) {
     const rawWindows = source.windows as Record<string, unknown>;
-    const raw = source.version !== 3 && period === 'forever' ? rawWindows.year : rawWindows[period];
+    const raw = (source.version === 1 || source.version === 2) && period === 'forever' ? rawWindows.year : rawWindows[period];
     if (!raw || typeof raw !== 'object') return null;
     const value = raw as Record<string, unknown>;
     if (!Number.isInteger(value.plays) || (value.plays as number) < 0 || (value.plays as number) > 1_000_000 ||
@@ -124,21 +150,30 @@ export function validateHistoryProfile(input: unknown): HistoryProfile | null {
   }
   if (windows.month.plays > windows.year.plays || windows.year.plays > windows.forever.plays) return null;
   const profileSource = source.source === 'recent' || source.source === 'upload' ? source.source : undefined;
-  const lifetimeReady = source.version === 3 && source.lifetimeReady === true;
-  if (source.version === 1 || (source.version === 3 && source.rotationTracks === undefined)) {
-    return { version: source.version, windows, lifetimeReady, ...(profileSource ? { source: profileSource } : {}) };
+  const lifetimeReady = (source.version === 3 || source.version === 4) && source.lifetimeReady === true;
+  let trackFingerprints: TrackFingerprints | undefined;
+  if (source.version === 4) {
+    if (!source.trackFingerprints || typeof source.trackFingerprints !== 'object') return null;
+    const fingerprints = source.trackFingerprints as Record<string, unknown>;
+    if (fingerprints.encoding !== 'fnv1a64-be-base64-v1' || !Number.isInteger(fingerprints.count) || (fingerprints.count as number) < 1 ||
+      (fingerprints.count as number) > windows.forever.uniqueTracks || typeof fingerprints.data !== 'string' || fingerprints.data.length > 11_000_004 ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(fingerprints.data) || fingerprints.data.length !== Math.ceil((fingerprints.count as number) * 8 / 3) * 4) return null;
+    trackFingerprints = { encoding: 'fnv1a64-be-base64-v1', count: fingerprints.count as number, data: fingerprints.data };
   }
-  if (!Array.isArray(source.rotationTracks) || source.rotationTracks.length < 1 || source.rotationTracks.length > 500 || source.rotationTracks.length > windows.forever.uniqueTracks) return null;
-  const rotationTracks: RotationTrack[] = [];
-  const trackKeys = new Set<string>();
-  for (const item of source.rotationTracks) {
-    if (!item || typeof item !== 'object') return null;
-    const track = item as Record<string, unknown>;
-    if (typeof track.artist !== 'string' || typeof track.title !== 'string' || !track.artist.trim() || !track.title.trim() || track.artist.length > 100 || track.title.length > 150) return null;
-    const key = `${track.artist.toLocaleLowerCase('it')}\u0000${track.title.toLocaleLowerCase('it')}`;
-    if (trackKeys.has(key)) return null;
-    trackKeys.add(key);
-    rotationTracks.push({ artist: track.artist, title: track.title });
+  let rotationTracks: RotationTrack[] | undefined;
+  if (source.rotationTracks !== undefined) {
+    if (!Array.isArray(source.rotationTracks) || source.rotationTracks.length < 1 || source.rotationTracks.length > 500 || source.rotationTracks.length > windows.forever.uniqueTracks) return null;
+    rotationTracks = [];
+    const trackKeys = new Set<string>();
+    for (const item of source.rotationTracks) {
+      if (!item || typeof item !== 'object') return null;
+      const track = item as Record<string, unknown>;
+      if (typeof track.artist !== 'string' || typeof track.title !== 'string' || !track.artist.trim() || !track.title.trim() || track.artist.length > 100 || track.title.length > 150) return null;
+      const key = `${track.artist.toLocaleLowerCase('it')}\u0000${track.title.toLocaleLowerCase('it')}`;
+      if (trackKeys.has(key)) return null;
+      trackKeys.add(key);
+      rotationTracks.push({ artist: track.artist, title: track.title });
+    }
   }
-  return { version: source.version, windows, lifetimeReady, rotationTracks, ...(profileSource ? { source: profileSource } : {}) };
+  return { version: source.version, windows, lifetimeReady, ...(rotationTracks ? { rotationTracks } : {}), ...(trackFingerprints ? { trackFingerprints } : {}), ...(profileSource ? { source: profileSource } : {}) };
 }
