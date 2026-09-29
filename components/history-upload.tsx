@@ -36,7 +36,7 @@ export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'mas
       setFiles([]);
       await refresh();
       onUpdated?.();
-      setNotice(`Cronologia salvata: ${result.plays?.toLocaleString('it-IT') ?? ''} ascolti complessivi elaborati.`);
+      setNotice(`Le prove sono agli atti: il Maestro esaminerà ${result.plays?.toLocaleString('it-IT') ?? ''} ascolti complessivi.`);
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Caricamento non riuscito.'); }
     finally { setBusy(false); }
   }
@@ -47,7 +47,7 @@ export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'mas
       if (!response.ok) throw new Error('Eliminazione non riuscita.');
       await refresh();
       onUpdated?.();
-      setNotice('Cronologia eliminata.');
+      setNotice('Le prove sono state ritirate. Il Maestro sospende il giudizio.');
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Eliminazione non riuscita.'); }
     finally { setBusy(false); }
   }
@@ -57,15 +57,15 @@ export default function HistoryUpload({ role, onUpdated }: { role: 'user' | 'mas
       <li>Richiedi <strong>Cronologia di ascolto estesa</strong> (intero account), non la cronologia standard dell’ultimo anno.</li>
       <li>Quando Spotify ti invia lo ZIP, estrailo e seleziona qui tutti i file JSON della cronologia musicale.</li>
     </ol>
-    <p className="history-help">Carica tutti i JSON della cronologia estesa. Calcoliamo tre confronti: ultimi 30 giorni, ultimo anno e intera cronologia. Escludiamo podcast e riproduzioni sotto i 30 secondi. {role === 'master' ? 'Oltre ai conteggi degli artisti, salviamo fino a 500 titoli e artisti tra i brani più ascoltati per la rotazione casuale della dashboard. Un brano alla volta sarà visibile agli utenti; il profilo completo rimane privato.' : 'Il browser invia soltanto i conteggi degli artisti necessari al confronto.'} IP, dispositivo e file originali non vengono salvati.</p>
-    <label className="history-file-label"><FileUp size={18}/> Seleziona i file JSON<input type="file" accept=".json,application/json" multiple onChange={event => setFiles([...event.target.files ?? []])} /></label>
+    <p className="history-help">Presenta tutti i JSON della cronologia estesa. Il tribunale esamina tre periodi: ultimi 30 giorni, ultimo anno e intera cronologia. Escludiamo podcast e riproduzioni sotto i 30 secondi. {role === 'master' ? 'Oltre ai conteggi degli artisti, custodiamo fino a 500 titoli e artisti tra i brani più ascoltati per la playlist sacra. Una reliquia alla volta sarà visibile agli utenti; il canone completo resta privato.' : 'Il browser invia soltanto i conteggi degli artisti necessari al verdetto.'} IP, dispositivo e file originali non vengono salvati.</p>
+    <label className="history-file-label"><FileUp size={18}/> Seleziona le prove in formato JSON<input type="file" accept=".json,application/json" multiple onChange={event => setFiles([...event.target.files ?? []])} /></label>
     {files.length > 0 && <p className="history-selected">{files.length} {files.length === 1 ? 'file selezionato' : 'file selezionati'}: {files.map(file => file.name).join(', ')}</p>}
-    <div className="history-actions"><button className="connect" type="button" disabled={busy || !files.length} onClick={upload}>{busy ? 'Elaborazione…' : current ? 'Sostituisci cronologia' : 'Carica cronologia'}</button>{current && <button className="history-delete" type="button" disabled={busy} onClick={remove}><Trash2 size={15}/> Elimina</button>}</div>
+    <div className="history-actions"><button className="connect" type="button" disabled={busy || !files.length} onClick={upload}>{busy ? 'Il Maestro esamina…' : current ? 'Sostituisci le prove' : 'Presenta le prove'}</button>{current && <button className="history-delete" type="button" disabled={busy} onClick={remove}><Trash2 size={15}/> Ritira le prove</button>}</div>
     {current && <p className="history-status">Ultimo caricamento: {new Date(current.uploadedAt).toLocaleDateString('it-IT')} · {current.plays.toLocaleString('it-IT')} {current.lifetimeReady ? 'ascolti complessivi' : 'ascolti nell’ultimo anno'}.</p>}
     {current && !current.lifetimeReady && <p className="history-status">Ricarica tutti i JSON della cronologia estesa per attivare il confronto “Da sempre”.</p>}
-    {role === 'master' && current && !status?.master?.rotationReady && <p className="history-status">Ricarica la cronologia master per attivare la rotazione casuale dei brani: il caricamento precedente conservava solo gli artisti.</p>}
-    {role === 'user' && status && !status.masterReady && <p className="history-status">Il confronto sarà disponibile quando l’admin avrà caricato la cronologia master.</p>}
-    {role === 'user' && status?.masterReady && !status.masterLifetimeReady && <p className="history-status">Il confronto “Da sempre” sarà disponibile quando l’admin avrà ricaricato la cronologia master completa.</p>}
+    {role === 'master' && current && !status?.master?.rotationReady && <p className="history-status">Ricostruisci il sacro canone per attivare la playlist del Maestro: il vecchio archivio conservava soltanto gli artisti.</p>}
+    {role === 'user' && status && !status.masterReady && <p className="history-status">Il verdetto resterà sospeso finché il Sommo Maestro non avrà depositato il proprio sacro canone.</p>}
+    {role === 'user' && status?.masterReady && !status.masterLifetimeReady && <p className="history-status">Il giudizio “Da sempre” attende che il Maestro completi i propri archivi.</p>}
     {notice && <p className="history-success" role="status">{notice}</p>}
     {error && <p className="history-error" role="alert">{error}</p>}
   </div>;

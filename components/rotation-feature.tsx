@@ -41,17 +41,17 @@ export default function RotationFeature({ revision, selected, setSelected, saved
   }, [revision]);
 
   return <section className="panel feature">
-    <div className="section-top"><h2><span className="mint"><AudioLines size={20}/></span> Dalla playlist sacra del Maestro</h2><span className="micro-label">{masterTrack ? 'DAL RIFERIMENTO MASTER' : 'SELEZIONE DEMO'}</span></div>
+    <div className="section-top"><h2><span className="mint"><AudioLines size={20}/></span> Dalla playlist sacra del Maestro</h2><span className="micro-label">{masterTrack ? 'BENEDIZIONE DI SUA SANTITÀ' : 'RELIQUIE DIMOSTRATIVE'}</span></div>
     {masterTrack ? <>
       <div className="featured-song">
         <div className="master-art" aria-hidden="true"><AudioLines size={58}/><span>MITCHOMETRO<br/>MASTER ROTATION</span></div>
-        <div className="song-info"><span className="tag">SCELTA CASUALE</span><h3>{masterTrack.title}</h3><p className="artist">{masterTrack.artist}</p><p>Un brano dal riferimento privato.</p><div className="song-actions"><a className="play-link" href={`https://open.spotify.com/search/${encodeURIComponent(`${masterTrack.artist} ${masterTrack.title}`)}`} target="_blank" rel="noreferrer"><Disc3 size={17}/> Cerca su Spotify <ArrowUpRight size={15}/></a></div></div>
+        <div className="song-info"><span className="tag">SCELTA CONSACRATA</span><h3>{masterTrack.title}</h3><p className="artist">{masterTrack.artist}</p><p>Una reliquia dal sacro canone privato di Mitch.</p><div className="song-actions"><a className="play-link" href={`https://open.spotify.com/search/${encodeURIComponent(`${masterTrack.artist} ${masterTrack.title}`)}`} target="_blank" rel="noreferrer"><Disc3 size={17}/> Cerca su Spotify <ArrowUpRight size={15}/></a></div></div>
       </div>
-      <div className="master-selector"><span>Scelto tra i brani più ascoltati nella cronologia master.</span><button type="button" onClick={() => { setBusy(true); void refresh(masterTrack); }} disabled={busy}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Un altro brano</button></div>
+      <div className="master-selector"><span>Estratto dagli archivi personali del Sommo Maestro.</span><button type="button" onClick={() => { setBusy(true); void refresh(masterTrack); }} disabled={busy}><RefreshCw size={15} className={busy ? 'spin' : ''}/> Un’altra reliquia</button></div>
     </> : <>
       <div className="featured-song"><a href={demoTrack.source} target="_blank" rel="noreferrer" aria-label={`Copertina di ${demoTrack.album} su Apple Music`}><img className="cover" src={demoTrack.image} alt={`Copertina ${demoTrack.album}`} /></a><div className="song-info"><span className="tag">{demoTrack.genre}</span><h3>{demoTrack.title}</h3><p className="artist">{demoTrack.artist}</p><p>{demoTrack.album} · {demoTrack.year}</p><div className="song-actions"><a className="play-link" href={`https://open.spotify.com/search/${encodeURIComponent(`${demoTrack.artist} ${demoTrack.title}`)}`} target="_blank" rel="noreferrer"><Disc3 size={17}/> Apri in Spotify <ArrowUpRight size={15}/></a><button className={`icon-button ${saved.includes(selected) ? 'liked' : ''}`} aria-label={saved.includes(selected) ? 'Rimuovi dai salvati' : 'Salva brano'} aria-pressed={saved.includes(selected)} onClick={() => toggleSave(selected)}><Heart size={20} fill={saved.includes(selected) ? 'currentColor' : 'none'}/></button></div></div></div>
       <div className="track-selector">{tracks.map((track, index) => <button key={track.title} onClick={() => setSelected(index)} aria-label={`Mostra ${track.title}`} aria-pressed={index === selected} className={index === selected ? 'active' : ''}><span>0{index + 1}</span><span>{track.artist}</span></button>)}</div>
     </>}
-    <div className="feature-footer"><Headphones size={16}/><span>La colonna sonora della tua personalità.</span><span className="mint">Falla sentire.</span></div>
+    <div className="feature-footer"><Headphones size={16}/><span>Il Maestro propone. Il fedele ascolta.</span><span className="mint">Così è scritto.</span></div>
   </section>;
 }

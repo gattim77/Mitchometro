@@ -1,4 +1,4 @@
-import type { EvaluationSettings } from './evaluation-settings';
+import type { EvaluationSettings, MessageVariant } from './evaluation-settings';
 import type { HistoryProfile, HistoryWindow, Period } from '@/lib/history-profile';
 // Only imported by server routes. Synthetic fixtures; no Spotify data.
 const reference = { variety: 12, discovery: 0.4, identity: 5, genres: [0.35, 0.30, 0.20, 0.15] };
@@ -8,25 +8,30 @@ const samples = {
   forever: { variety: 16, discovery: 0.47, identity: 6.1, genres: [0.34, 0.29, 0.21, 0.16], artists: 486, tracks: 2410 },
 };
 const demoArtists = { month: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez'], year: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez', 'Daft Punk', 'Måneskin'], forever: ['The Weeknd', 'Arctic Monkeys', 'SZA', 'Gigi Perez', 'Daft Punk', 'Måneskin', 'Radiohead'] };
+const mitchTitles = ['Sua Santità del Punk', 'Il Sommo Maestro', 'Il Gran Sacerdote del Volume', 'L’Oracolo del Ritornello'];
+function mitchVerdict(message: MessageVariant, score: number): MessageVariant {
+  const judge = mitchTitles[Math.floor(score / 10) % mitchTitles.length];
+  return { title: `${judge} ha sentenziato: ${message.title}`, body: `Mitch ti giudica: ${message.body}` };
+}
 export function analyze(period: keyof typeof samples, settings: EvaluationSettings) {
   const user = samples[period];
   const match = Math.round(100 * user.genres.reduce((sum, value, i) => sum + Math.min(value, reference.genres[i]), 0));
   const metrics = [
-    { key: 'variety', name: 'Varietà', value: Math.min(120, Math.round(user.variety / reference.variety * 100)), detail: `${user.variety} generi nel tuo universo`, description: 'Ampiezza dei generi ascoltati rispetto al riferimento.' },
-    { key: 'discovery', name: 'Scoperta', value: Math.min(120, Math.round(user.discovery / reference.discovery * 100 + 1e-8)), detail: `${Math.round(user.discovery * 100)}% di nuovi artisti`, description: 'Quota di artisti nuovi rispetto al periodo precedente.' },
-    { key: 'identity', name: 'Identità', value: Math.min(120, Math.round(user.identity / reference.identity * 100)), detail: 'Un suono che ti somiglia', description: 'Continuità delle preferenze nel modello dimostrativo.' },
-    { key: 'affinity', name: 'Affinità', value: match, detail: 'In sintonia con il riferimento', description: 'Sovrapposizione tra distribuzioni di generi. Massimo 100.' },
+    { key: 'variety', name: 'Ampiezza del repertorio', value: Math.min(120, Math.round(user.variety / reference.variety * 100)), detail: `${user.variety} generi convocati a giudizio`, description: 'Sua Santità misura l’ampiezza dei generi rispetto al proprio sacro canone.' },
+    { key: 'discovery', name: 'Spirito di scoperta', value: Math.min(120, Math.round(user.discovery / reference.discovery * 100 + 1e-8)), detail: `${Math.round(user.discovery * 100)}% di nuovi testimoni`, description: 'Il Maestro premia gli artisti scoperti nel periodo.' },
+    { key: 'identity', name: 'Fede musicale', value: Math.min(120, Math.round(user.identity / reference.identity * 100)), detail: 'Un credo sonoro riconoscibile', description: 'L’Oracolo del Ritornello valuta la continuità delle preferenze.' },
+    { key: 'affinity', name: 'Grazia del Maestro', value: match, detail: 'In sintonia con il sacro canone', description: 'Sovrapposizione con il repertorio di Mitch. Massimo 100.' },
   ];
   const baseScore = Math.round(metrics.slice(0, 3).reduce((sum, metric) => sum + metric.value, 0) / 3 * (0.8 + 0.2 * match / 100));
   const artists = new Set(demoArtists[period].map(name => name.toLocaleLowerCase('it')));
   const adjustment = Math.max(-20, Math.min(20, settings.bandRules.reduce((sum, rule) => sum + (artists.has(rule.name.toLocaleLowerCase('it')) ? rule.adjustment : 0), 0)));
   const score = Math.max(0, Math.min(120, baseScore + adjustment));
   const level = settings.messages.find(message => score >= message.min && score <= message.max)!;
-  const scoreMessage = level.variants[Math.floor(Math.random() * level.variants.length)];
+  const scoreMessage = mitchVerdict(level.variants[Math.floor(Math.random() * level.variants.length)], score);
   return { mode: 'demo' as const, period, score, scoreMessage, match, artists: user.artists, tracks: user.tracks, metrics,
     genres: ['Alternative', 'Pop', 'R&B / Soul', 'Elettronica'].map((name, i) => ({ name, share: Math.round(user.genres[i] * 100) })),
-    strength: { title: 'La tua identità si sente.', text: 'Torni ai suoni che ami senza perdere la tua personalità. Nel modello demo, la continuità delle tue preferenze supera il riferimento.' },
-    weakness: { title: period === 'month' ? 'Esci dalla comfort zone.' : 'Continua a cambiare prospettiva.', text: period === 'month' ? 'La scoperta è il tuo margine più grande: prova un artista che non hai mai ascoltato, fuori dai tuoi generi abituali.' : 'Hai ampliato i tuoi ascolti. Alterna i preferiti a generi meno presenti per continuare a esplorare.' }
+    strength: { title: 'Il Maestro annuisce, appena.', text: 'La tua identità musicale è abbastanza netta da ottenere un cenno di approvazione dal Sommo Giudice.' },
+    weakness: { title: period === 'month' ? 'Sua Santità esige più coraggio.' : 'L’Oracolo pretende nuove prospettive.', text: period === 'month' ? 'La scoperta è il capo d’accusa principale: osa un artista mai ascoltato e forse Mitch sarà clemente.' : 'Il repertorio si è ampliato, ma il Maestro ordina di alternare i preferiti a territori meno battuti.' }
   };
 }
 
@@ -57,10 +62,10 @@ export function analyzeHistory(period: Period, userProfile: HistoryProfile, mast
   const ratio = (a: number, b: number) => Math.max(0, Math.min(120, Math.round(a / Math.max(b, 0.000001) * 100)));
   const match = affinity(user, master);
   const metrics = [
-    { key: 'variety', name: 'Varietà', value: ratio(own.diversity, baseline.diversity), detail: `${user.uniqueArtists} artisti ascoltati`, description: 'Diversità degli artisti ascoltati rispetto al riferimento.' },
-    { key: 'discovery', name: 'Scoperta', value: ratio(own.discovery, baseline.discovery), detail: `${Math.round(own.discovery * 100)} artisti distinti ogni 100 ascolti`, description: 'Quota di artisti distinti per ascolto rispetto al riferimento.' },
-    { key: 'identity', name: 'Identità', value: ratio(own.identity, baseline.identity), detail: `${Math.round(own.identity * 100)}% ai cinque artisti preferiti`, description: 'Peso dei cinque artisti più ascoltati rispetto al riferimento.' },
-    { key: 'affinity', name: 'Affinità', value: match, detail: 'Artisti in comune con il riferimento', description: 'Sovrapposizione delle distribuzioni di ascolto degli artisti. Massimo 100.' },
+    { key: 'variety', name: 'Ampiezza del repertorio', value: ratio(own.diversity, baseline.diversity), detail: `${user.uniqueArtists} artisti convocati`, description: 'Il Maestro confronta la diversità degli artisti con il proprio sacro canone.' },
+    { key: 'discovery', name: 'Spirito di scoperta', value: ratio(own.discovery, baseline.discovery), detail: `${Math.round(own.discovery * 100)} testimoni distinti ogni 100 ascolti`, description: 'Sua Santità misura quanti artisti distinti compaiono in rapporto agli ascolti.' },
+    { key: 'identity', name: 'Fede musicale', value: ratio(own.identity, baseline.identity), detail: `${Math.round(own.identity * 100)}% ai cinque artisti prediletti`, description: 'L’Oracolo valuta il peso dei cinque artisti più ascoltati rispetto al proprio canone.' },
+    { key: 'affinity', name: 'Grazia del Maestro', value: match, detail: 'Artisti condivisi con il sacro canone', description: 'Sintonia tra la tua distribuzione degli ascolti e quella di Mitch. Massimo 100.' },
   ];
   const baseScore = Math.round(metrics.slice(0, 3).reduce((sum, metric) => sum + metric.value, 0) / 3 * (0.8 + 0.2 * match / 100));
   const names = new Set(user.artists.map(item => item.name.toLocaleLowerCase('it')));
@@ -68,13 +73,13 @@ export function analyzeHistory(period: Period, userProfile: HistoryProfile, mast
     sum + (names.has(rule.name.toLocaleLowerCase('it')) ? rule.adjustment : 0), 0)));
   const score = Math.max(0, Math.min(120, baseScore + adjustment));
   const level = settings.messages.find(message => score >= message.min && score <= message.max)!;
-  const scoreMessage = level.variants[Math.floor(Math.random() * level.variants.length)];
+  const scoreMessage = mitchVerdict(level.variants[Math.floor(Math.random() * level.variants.length)], score);
   const ranked = metrics.slice(0, 3).sort((a, b) => b.value - a.value);
   return {
     mode: 'real' as const, period, score, scoreMessage, match, artists: user.uniqueArtists, tracks: user.uniqueTracks, metrics,
     genres: user.artists.slice(0, 4).map(item => ({ name: item.name, share: Math.round(item.count / Math.max(1, user.plays) * 100) })),
-    strength: { title: `${ranked[0].name}: il tuo punto forte.`, text: `Questo indicatore è a ${ranked[0].value}/120 rispetto al profilo di riferimento.` },
-    weakness: { title: `${ranked[2].name}: qui puoi crescere.`, text: `Questo indicatore è a ${ranked[2].value}/120 rispetto al profilo di riferimento.` },
+    strength: { title: `${ranked[0].name}: il Maestro concede la grazia.`, text: `Sua Santità del Punk decreta ${ranked[0].value}/120 rispetto al proprio sacro canone.` },
+    weakness: { title: `${ranked[2].name}: capo d’accusa principale.`, text: `Il Sommo Maestro assegna ${ranked[2].value}/120 e ordina un’immediata revisione del repertorio.` },
   };
 }
 
