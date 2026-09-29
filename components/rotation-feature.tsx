@@ -41,7 +41,7 @@ export default function RotationFeature({ revision, selected, setSelected, saved
   }, [revision]);
 
   return <section className="panel feature">
-    <div className="section-top"><h2><span className="mint"><AudioLines size={20}/></span> Nella tua rotazione</h2><span className="micro-label">{masterTrack ? 'DAL RIFERIMENTO MASTER' : 'SELEZIONE DEMO'}</span></div>
+    <div className="section-top"><h2><span className="mint"><AudioLines size={20}/></span> Dalla playlist sacra del Maestro</h2><span className="micro-label">{masterTrack ? 'DAL RIFERIMENTO MASTER' : 'SELEZIONE DEMO'}</span></div>
     {masterTrack ? <>
       <div className="featured-song">
         <div className="master-art" aria-hidden="true"><AudioLines size={58}/><span>MITCHOMETRO<br/>MASTER ROTATION</span></div>
