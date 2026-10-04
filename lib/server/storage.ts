@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { runtimeString } from './runtime-env';
 
 const encoder = new TextEncoder();
 
@@ -10,7 +11,7 @@ export async function actor() {
   const email = user.email.toLowerCase();
   const isMasterOwner = identity
     ? identity.owner_id === user.userId && identity.email === email
-    : !!env.MASTER_USER_EMAIL && email === env.MASTER_USER_EMAIL.toLowerCase();
+    : !!runtimeString('MASTER_USER_EMAIL') && email === runtimeString('MASTER_USER_EMAIL')!.toLowerCase();
   return { id: user.userId, email, isMasterOwner };
 }
 

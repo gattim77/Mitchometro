@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
-import { env } from 'cloudflare:workers';
 import { actor, database, decrypt, digest, encrypt, randomUrlSafe } from './storage';
 import { adminPasswordHash } from './admin-password';
+import { runtimeString } from './runtime-env';
 
 export const ADMIN_COOKIE = '__Host-mitch-admin';
 const SESSION_MS = 12 * 60 * 60 * 1000;
@@ -58,8 +58,9 @@ async function matchedTotpStep(secret: string, code: string, lastUsed = -1) {
   return null;
 }
 function encryptionKey() {
-  if (!env.SPOTIFY_TOKEN_KEY) throw new Error('Admin encryption key is unavailable');
-  return env.SPOTIFY_TOKEN_KEY;
+  const key = runtimeString('SPOTIFY_TOKEN_KEY');
+  if (!key) throw new Error('Admin encryption key is unavailable');
+  return key;
 }
 export async function adminConfigured() {
   return !!(await database().prepare('SELECT id FROM admin_credentials WHERE id = 1').first());
@@ -136,12 +137,15 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 }
 async function sendTransferEmail(email: string, link: string) {
+  const apiKey = runtimeString('RESEND_API_KEY');
+  const from = runtimeString('ADMIN_EMAIL_FROM');
+  if (!apiKey || !from) throw new Error('ADMIN_EMAIL_UNAVAILABLE');
   const safeLink = escapeHtml(link);
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: env.ADMIN_EMAIL_FROM,
+      from,
       to: [email],
       subject: 'Sei stato nominato nuovo Re di Mitchometro',
       text: `Sei stato scelto come nuovo amministratore di Mitchometro. Completa il passaggio entro 24 ore: ${link}\n\nDovrai accedere con questo indirizzo email, scegliere una nuova password e configurare una nuova autenticazione a due fattori. Se non ti aspettavi questo invito, ignoralo.`,
@@ -161,7 +165,7 @@ export async function requestAdminTransfer(ownerId: string, currentEmail: string
     requested_by = excluded.requested_by, password_salt = NULL, password_hash = NULL, totp_secret = NULL, expires_at = excluded.expires_at, attempts = 0`)
     .bind(tokenHash, email, ownerId, Date.now() + TRANSFER_MS).run();
   const link = `${origin}/admin/transfer?token=${encodeURIComponent(token)}`;
-  if (env.RESEND_API_KEY && env.ADMIN_EMAIL_FROM) {
+  if (runtimeString('RESEND_API_KEY') && runtimeString('ADMIN_EMAIL_FROM')) {
     try { await sendTransferEmail(email, link); }
     catch (error) {
       await database().prepare('DELETE FROM admin_transfers WHERE token_hash = ?').bind(tokenHash).run();

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
-import { env } from 'cloudflare:workers';
 import { createSession, normalizeDisplayName, normalizeEmail, safeReturnTo, sessionCookie } from '@/lib/server/auth';
 import { database } from '@/lib/server/storage';
+import { runtimeString } from '@/lib/server/runtime-env';
 
 type GoogleProfile = { sub?: string; email?: string; email_verified?: boolean; name?: string };
 
@@ -13,11 +13,13 @@ export async function GET(request: Request) {
   const returnTo = safeReturnTo(decodeURIComponent(jar.get('__Host-mitch-google-return')?.value || '/'));
   const clear = '__Host-mitch-google-state=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax';
   const fail = (reason: string) => new Response(null, { status: 302, headers: { Location: `/login?error=${reason}`, 'Set-Cookie': clear, 'Cache-Control': 'no-store' } });
-  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !state || state !== url.searchParams.get('state') || !verifier || !url.searchParams.get('code')) return fail('google_failed');
+  const clientId = runtimeString('GOOGLE_CLIENT_ID');
+  const clientSecret = runtimeString('GOOGLE_CLIENT_SECRET');
+  if (!clientId || !clientSecret || !state || state !== url.searchParams.get('state') || !verifier || !url.searchParams.get('code')) return fail('google_failed');
   try {
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, code: url.searchParams.get('code')!, code_verifier: verifier, grant_type: 'authorization_code', redirect_uri: `${url.origin}/api/auth/google/callback` }),
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code: url.searchParams.get('code')!, code_verifier: verifier, grant_type: 'authorization_code', redirect_uri: `${url.origin}/api/auth/google/callback` }),
     });
     const token = await tokenResponse.json() as { access_token?: string };
     if (!tokenResponse.ok || !token.access_token) return fail('google_failed');
