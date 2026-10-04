@@ -1,10 +1,8 @@
-import Link from 'next/link';
-
 export const metadata = { title: 'Privacy — Mitchometro' };
 
 export default function Privacy() {
   return <main className="privacy-page">
-    <Link href="/">← Mitchometro</Link>
+    <a href="/">← Mitchometro</a>
     <h1>Privacy</h1>
     <p>Carichi i file JSON della cronologia di ascolto estesa che hai scaricato dal tuo account Spotify. Mitchometro non collega il tuo account e non chiede la tua password Spotify.</p>
     <p>Il browser legge i JSON e invia conteggi per artista, indicatori aggregati e un’impronta tecnica non leggibile per ogni brano unico. Le impronte permettono di contare i brani condivisi sull’intero archivio senza inviare i titoli degli utenti. Non salviamo i file originali, i dati su IP e dispositivo presenti nei file o la sequenza cronologica dei singoli ascolti.</p>
