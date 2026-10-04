@@ -1,4 +1,4 @@
-import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { getUser } from '@/lib/server/auth';
 import { adminAuthorized } from '@/lib/server/admin-auth';
 import { database, safeOrigin } from '@/lib/server/storage';
 import { validateHistoryProfile } from '@/lib/history-profile';
@@ -6,7 +6,7 @@ import { validateHistoryProfile } from '@/lib/history-profile';
 const headers = { 'Cache-Control': 'no-store' };
 
 export async function GET() {
-  const user = await getChatGPTUser();
+  const user = await getUser();
   if (!user) return Response.json({ error: 'Accesso richiesto.' }, { status: 401, headers });
   try {
     const db = database();
@@ -29,7 +29,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await getChatGPTUser();
+  const user = await getUser();
   if (!user) return Response.json({ error: 'Accesso richiesto.' }, { status: 401, headers });
   if (!safeOrigin(request)) return Response.json({ error: 'Richiesta non valida.' }, { status: 403, headers });
   if (Number(request.headers.get('content-length')) > 20_000_000) return Response.json({ error: 'La cronologia supera il limite tecnico di caricamento.' }, { status: 413, headers });
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = await getChatGPTUser();
+  const user = await getUser();
   if (!user) return Response.json({ error: 'Accesso richiesto.' }, { status: 401, headers });
   if (!safeOrigin(request)) return Response.json({ error: 'Richiesta non valida.' }, { status: 403, headers });
   const payload = await request.json().catch(() => null) as { role?: unknown } | null;

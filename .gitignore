@@ -58,6 +58,7 @@ next-env.d.ts
 
 # Generated caches, dependencies, and OS files
 node_modules/
+.pnpm-store/
 *.tsbuildinfo
 *.log
 .cache/
@@ -69,8 +70,3 @@ Desktop.ini
 venv/
 __pycache__/
 *.pyc
-
-# build/ contains required source plugins; keep those files.
-/build/*
-!/build/sites-vite-plugin.ts
-!/build/sites-vite-plugin.LICENSE

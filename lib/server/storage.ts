@@ -1,10 +1,10 @@
 import { env } from 'cloudflare:workers';
-import { getChatGPTUser } from '@/app/chatgpt-auth';
 
 const encoder = new TextEncoder();
 
 export async function actor() {
-  const user = await getChatGPTUser();
+  const { getUser } = await import('./auth');
+  const user = await getUser();
   if (!user) return null;
   const identity = await database().prepare('SELECT owner_id, email FROM admin_identity WHERE id = 1').first<{ owner_id: string; email: string }>();
   const email = user.email.toLowerCase();

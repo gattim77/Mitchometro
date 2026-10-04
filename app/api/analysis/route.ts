@@ -1,10 +1,10 @@
 import { getEvaluationSettings } from '@/lib/server/evaluation-settings';
 import { analyze, analyzeHistory } from '@/lib/server/analysis';
-import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { getUser } from '@/lib/server/auth';
 import { database } from '@/lib/server/storage';
 import { periods, validateHistoryProfile, type Period } from '@/lib/history-profile';
 export async function GET(request: Request) {
-  const user = await getChatGPTUser();
+  const user = await getUser();
   if (!user) return Response.json({ error: 'Accesso richiesto.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   const period = new URL(request.url).searchParams.get('period') ?? 'month';
   if (!periods.includes(period as Period)) return Response.json({ error: 'Periodo non valido.' }, { status: 400 });

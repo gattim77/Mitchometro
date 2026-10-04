@@ -1,11 +1,11 @@
-import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { getUser } from '@/lib/server/auth';
 import { validateHistoryProfile } from '@/lib/history-profile';
 import { database } from '@/lib/server/storage';
 
 const headers = { 'Cache-Control': 'private, no-store' };
 
 export async function GET(request: Request) {
-  const user = await getChatGPTUser();
+  const user = await getUser();
   if (!user) return Response.json({ error: 'Accesso richiesto.' }, { status: 401, headers });
   try {
     const row = await database().prepare("SELECT summary FROM listening_profiles WHERE role = 'master' ORDER BY uploaded_at DESC LIMIT 1")

@@ -1,5 +1,29 @@
 import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 
+export const appUsers = sqliteTable('app_users', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  displayName: text('display_name'),
+  passwordSalt: text('password_salt'),
+  passwordHash: text('password_hash'),
+  googleSub: text('google_sub').unique(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const appSessions = sqliteTable('app_sessions', {
+  tokenHash: text('token_hash').primaryKey(),
+  userId: text('user_id').notNull().references(() => appUsers.id, { onDelete: 'cascade' }),
+  expiresAt: integer('expires_at').notNull(),
+  createdAt: integer('created_at').notNull(),
+}, table => [index('idx_app_sessions_user').on(table.userId)]);
+
+export const appLoginLimits = sqliteTable('app_login_limits', {
+  email: text('email').primaryKey(),
+  failedCount: integer('failed_count').notNull(),
+  lockedUntil: integer('locked_until').notNull(),
+});
+
 export const evaluationSettings = sqliteTable('evaluation_settings', {
   id: integer('id').primaryKey(),
   bandRules: text('band_rules').notNull(),

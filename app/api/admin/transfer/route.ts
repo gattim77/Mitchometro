@@ -1,11 +1,11 @@
-import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { getUser } from '@/lib/server/auth';
 import { adminAuthorized, adminTransferStatus, beginAdminTransfer, completeAdminTransfer, requestAdminTransfer, sessionCookie } from '@/lib/server/admin-auth';
 import { actor, safeOrigin } from '@/lib/server/storage';
 
 const headers = { 'Cache-Control': 'private, no-store' };
 
 export async function GET(request: Request) {
-  const user = await getChatGPTUser();
+  const user = await getUser();
   if (!user) return Response.json({ valid: false }, { status: 401, headers });
   const token = new URL(request.url).searchParams.get('token');
   return Response.json(await adminTransferStatus(token, user.email), { headers });
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       if ('error' in result) return Response.json({ error: result.error }, { status: result.status, headers });
       return Response.json(result, { headers });
     }
-    const user = await getChatGPTUser();
+    const user = await getUser();
     if (!user) return Response.json({ error: 'Accedi con l’indirizzo che ha ricevuto l’invito.' }, { status: 401, headers });
     if (payload.action === 'begin') {
       const result = await beginAdminTransfer(payload.token, user.userId, user.email, payload.password);
