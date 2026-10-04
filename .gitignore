@@ -30,6 +30,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -44,3 +45,32 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# Local environment, credentials, and data
+.dev.vars*
+!.dev.vars.example
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
+
+# Generated caches, dependencies, and OS files
+node_modules/
+*.tsbuildinfo
+*.log
+.cache/
+.turbo/
+Thumbs.db
+Desktop.ini
+._*
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# build/ contains required source plugins; keep those files.
+/build/*
+!/build/sites-vite-plugin.ts
+!/build/sites-vite-plugin.LICENSE
