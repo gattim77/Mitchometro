@@ -5,6 +5,9 @@
   "compatibility_date": "2026-10-04",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": true,
+  "vars": {
+    "MASTER_USER_EMAIL": "gattim@gmail.com"
+  },
   "assets": {
     "directory": "dist/client",
     "binding": "ASSETS",
@@ -14,7 +17,7 @@
     {
       "binding": "DB",
       "database_name": "mitchometro",
-      "database_id": "00000000-0000-4000-8000-000000000000",
+      "database_id": "36a2e0ed-e14f-40f8-8283-3c0208ae2601",
       "migrations_dir": "drizzle"
     }
   ],
