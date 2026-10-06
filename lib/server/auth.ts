@@ -67,7 +67,7 @@ export async function getUser(): Promise<AppUser | null> {
   if (!token || !/^[A-Za-z0-9_-]{40,100}$/.test(token)) return null;
   const now = Date.now();
   const row = await database().prepare(`SELECT u.id, u.email, u.display_name, s.expires_at
-    FROM app_sessions s JOIN app_users u ON u.id = s.user_id WHERE s.token_hash = ?`)
+    FROM app_sessions s JOIN app_users u ON u.id = s.user_id LEFT JOIN third_admin_controls c ON c.user_id=u.id WHERE s.token_hash = ? AND COALESCE(c.status,'active')='active'`)
     .bind(await digest(token)).first<UserRow & { expires_at: number }>();
   if (!row || row.expires_at <= now) return null;
   return toUser(row);

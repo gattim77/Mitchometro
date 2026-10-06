@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const db = database();
   const limit = await db.prepare('SELECT failed_count, locked_until FROM app_login_limits WHERE email = ?').bind(email).first<{ failed_count: number; locked_until: number }>();
   if (limit && limit.locked_until > Date.now()) return Response.json({ error: 'Troppi tentativi. Riprova tra qualche minuto.' }, { status: 429 });
-  const row = await db.prepare('SELECT id, password_salt, password_hash FROM app_users WHERE email = ?').bind(email)
+  const row = await db.prepare('SELECT u.id, u.password_salt, u.password_hash FROM app_users u LEFT JOIN third_admin_controls c ON c.user_id=u.id WHERE u.email = ? AND COALESCE(c.status,\'active\')=\'active\'').bind(email)
     .first<{ id: string; password_salt: string | null; password_hash: string | null }>();
   const valid = !!row?.password_salt && !!row.password_hash && await verifyPassword(password, row.password_salt, row.password_hash);
   if (!valid) {

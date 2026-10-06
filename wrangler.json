@@ -1,9 +1,11 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mitchometro",
-  "main": "vinext/server/fetch-handler",
+  "main": "./build/cloudflare-worker.ts",
   "compatibility_date": "2026-10-04",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "preview_urls": true,
   "vars": {
     "MASTER_USER_EMAIL": "gattim@gmail.com"

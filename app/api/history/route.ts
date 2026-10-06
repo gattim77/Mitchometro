@@ -50,7 +50,9 @@ export async function POST(request: Request) {
       .bind(user.userId, role, JSON.stringify(storedProfile), Date.now(), plays).run();
     return Response.json({ ok: true, plays }, { headers });
   } catch (error) {
-    console.error('History upload failed', error);
+    const details = error instanceof Error ? error.message : '';
+    if (/quota exceeded|Uploads unavailable/.test(details)) return Response.json({ error: 'Caricamento non consentito: verifica stato account e quota.' }, { status: 403, headers });
+    console.error('History upload failed');
     return Response.json({ error: 'Salvataggio non riuscito. Riprova.' }, { status: 503, headers });
   }
 }
